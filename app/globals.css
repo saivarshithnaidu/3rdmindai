@@ -1,26 +1,311 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
 @import "tailwindcss";
 
+@theme {
+  --font-lora: "Cormorant Garamond", Georgia, serif;
+  --font-syne: "Cormorant Garamond", Georgia, serif;
+  --font-dmsans: "Inter", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --color-primary: #cc785c;
+  --color-primary-active: #a9583e;
+  --color-primary-disabled: #e6dfd8;
+  --color-ink: #141413;
+  --color-body: #3d3d3a;
+  --color-body-strong: #252523;
+  --color-muted: #6c6a64;
+  --color-muted-soft: #8e8b82;
+  --color-hairline: #e6dfd8;
+  --color-hairline-soft: #ebe6df;
+  --color-canvas: #faf9f5;
+  --color-surface-soft: #f5f0e8;
+  --color-surface-card: #efe9de;
+  --color-surface-cream-strong: #e8e0d2;
+  --color-surface-dark: #181715;
+  --color-surface-dark-elevated: #252320;
+  --color-surface-dark-soft: #1f1e1b;
+  --color-on-primary: #ffffff;
+  --color-on-dark: #faf9f5;
+  --color-on-dark-soft: #a09d96;
+  --color-accent-teal: #5db8a6;
+  --color-accent-amber: #e8a55a;
+  --color-success: #5db872;
+  --color-warning: #d4a017;
+  --color-error: #c64545;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-lora: "Cormorant Garamond", Georgia, serif;
+  --font-syne: "Cormorant Garamond", Georgia, serif;
+  --font-inter: "Inter", sans-serif;
+  --font-dmsans: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --background: #faf9f5;
+  --foreground: #141413;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: #faf9f5;
+  color: #141413;
+  font-family: var(--font-dmsans), "Inter", sans-serif;
 }
+
+/* Custom animations and utilities */
+@keyframes pulseGlow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 10px rgba(217, 119, 87, 0.5);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.95);
+    box-shadow: 0 0 4px rgba(217, 119, 87, 0.2);
+  }
+}
+
+.pulse-dot {
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+/* Linear-style Status Glows */
+@keyframes pulseGlowRunning {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(59, 130, 246, 0.7);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 3px rgba(59, 130, 246, 0.2);
+    transform: scale(0.92);
+  }
+}
+.pulse-glow-running {
+  animation: pulseGlowRunning 1.8s infinite ease-in-out;
+}
+
+@keyframes pulseGlowDone {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 2px rgba(16, 185, 129, 0.2);
+    transform: scale(0.96);
+  }
+}
+.pulse-glow-done {
+  animation: pulseGlowDone 2.5s infinite ease-in-out;
+}
+
+@keyframes pulseGlowError {
+  0%, 100% {
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.85);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 3px rgba(244, 63, 94, 0.3);
+    transform: scale(0.9);
+  }
+}
+.pulse-glow-error {
+  animation: pulseGlowError 1.5s infinite ease-in-out;
+}
+
+/* Shadcn-style Skeleton Shimmer loader */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.animate-shimmer {
+  background: linear-gradient(90deg, #F4F0EB 25%, #EBE5DC 50%, #F4F0EB 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+/* UI Overhaul — Entrance Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes gentlePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+}
+
+.animate-fadeIn { animation: fadeIn 0.2s ease-out forwards; }
+.animate-slideUp { animation: slideUp 0.25s ease-out forwards; }
+.animate-slideInRight { animation: slideInRight 0.2s ease-out forwards; }
+.animate-gentlePulse { animation: gentlePulse 2s ease-in-out infinite; }
+
+/* Resize Handle for Right Panel */
+.resize-handle {
+  position: absolute;
+  left: -2px;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  cursor: col-resize;
+  z-index: 30;
+  transition: background-color 0.15s ease;
+}
+.resize-handle:hover,
+.resize-handle.active {
+  background-color: rgba(217, 119, 87, 0.35);
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 32px;
+  border-radius: 9999px;
+  background: transparent;
+  transition: background-color 0.15s ease;
+}
+.resize-handle:hover::after,
+.resize-handle.active::after {
+  background: #D97757;
+}
+
+/* Icon Tab Tooltip */
+.icon-tab-tooltip {
+  position: relative;
+}
+.icon-tab-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: -28px;
+  left: 50%;
+  transform: translateX(-50%) translateY(2px);
+  background: #191919;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 50;
+}
+.icon-tab-tooltip:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.3s;
+}
+
+/* Custom scrollbar to match light theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* Cascade overrides to translate legacy hex classes into design token properties */
+.bg-\[\#FBF9F6\], 
+.bg-\[\#faf9f5\] {
+  background-color: var(--color-canvas) !important;
+}
+
+.bg-\[\#F4F0EB\],
+.bg-\[\#FAF6F0\] {
+  background-color: var(--color-surface-soft) !important;
+}
+
+.bg-\[\#FFFFFF\]:not(.bg-white) {
+  background-color: var(--color-canvas) !important;
+}
+
+.border-\[\#E5E0DA\] {
+  border-color: var(--color-hairline) !important;
+}
+
+.text-\[\#191919\] {
+  color: var(--color-ink) !important;
+}
+
+.text-\[\#5E5B56\] {
+  color: var(--color-muted) !important;
+}
+
+.text-\[\#85827D\] {
+  color: var(--color-muted-soft) !important;
+}
+
+.bg-\[\#D97757\],
+.bg-\[\#d97757\] {
+  background-color: var(--color-primary) !important;
+}
+
+.text-\[\#D97757\],
+.text-\[\#d97757\] {
+  color: var(--color-primary) !important;
+}
+
+.border-\[\#D97757\],
+.border-\[\#d97757\] {
+  border-color: var(--color-primary) !important;
+}
+
+.hover\:bg-\[\#ECE5DD\]:hover,
+.hover\:bg-\[\#E9E3DB\]:hover {
+  background-color: var(--color-surface-cream-strong) !important;
+}
+
+.hover\:bg-\[\#F9F8F6\]:hover {
+  background-color: var(--color-surface-card) !important;
+}
+
+.hover\:border-\[\#C2BCB2\]:hover {
+  border-color: var(--color-primary) !important;
+}
+
+/* Explicit font family and weight overrides to ensure Cormorant Garamond is applied to all serif display headings at weight 400 with negative tracking */
+.font-lora,
+.font-syne,
+h1, h2, h3, h4, h5, h6 {
+  font-family: "Cormorant Garamond", "Lora", Georgia, serif !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.025em !important;
+}
+
+/* Monospace overrides */
+.font-mono,
+code,
+pre {
+  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+}
+
+

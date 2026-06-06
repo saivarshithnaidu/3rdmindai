@@ -1,0 +1,693 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import Sidebar from '../sidebar/Sidebar';
+import RightPanel from '../rightpanel/RightPanel';
+import OrchestratorChat from './OrchestratorChat';
+import AgentChat from './AgentChat';
+import AgentBreadcrumb from './AgentBreadcrumb';
+import { Project, Agent, Message } from '../../types';
+import { supabaseService } from '../../services/supabase.service';
+import { Share2, Settings, PanelRight } from 'lucide-react';
+import { DEFAULT_ORCHESTRATOR_MODEL } from '../../lib/constants';
+import ConnectorsPage from '../connectors/ConnectorsPage';
+
+interface WorkspaceLayoutProps {
+  initialProject: Project;
+  initialAgents: Agent[];
+  allProjects: Project[];
+}
+
+export default function WorkspaceLayout({
+  initialProject,
+  initialAgents,
+  allProjects,
+}: WorkspaceLayoutProps) {
+  const [project, setProject] = useState<Project>(initialProject);
+  const [agents, setAgents] = useState<Agent[]>(initialAgents);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(true);
+  const [rightPanelWidth, setRightPanelWidth] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('3rdmind-panel-width');
+      if (saved) {
+        const val = parseInt(saved, 10);
+        return val > 100 ? 35 : val; // Reset old fixed-pixel layouts to 35%
+      }
+      return 35;
+    }
+    return 35;
+  });
+
+  const handlePanelWidthChange = useCallback((width: number) => {
+    setRightPanelWidth(width);
+    localStorage.setItem('3rdmind-panel-width', String(width));
+  }, []);
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_ORCHESTRATOR_MODEL);
+  const [isOrchestratorLoading, setIsOrchestratorLoading] = useState(false);
+  const [activeNavItem, setActiveNavItem] = useState('Chats');
+  const [activeRightTab, setActiveRightTab] = useState<'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council'>('agents');
+  const [activeConnectorsCount, setActiveConnectorsCount] = useState<number>(0);
+
+  const fetchActiveConnectorsCount = useCallback(async () => {
+    try {
+      const response = await fetch('/api/connectors/list');
+      if (response.ok) {
+        const data = await response.json();
+        const activeCount = data.filter((c: any) => c.isActive).length;
+        setActiveConnectorsCount(activeCount);
+      }
+    } catch (e) {
+      console.error('Failed to fetch active connectors count:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchActiveConnectorsCount();
+  }, [activeNavItem, fetchActiveConnectorsCount]);
+  const [hasSwitchedToCouncil, setHasSwitchedToCouncil] = useState(false);
+  const [previewContent, setPreviewContent] = useState<string>('');
+  const [previewTitle, setPreviewTitle] = useState<string>('Live Preview');
+
+  // Auto-switch to Council tab when a council is running
+  useEffect(() => {
+    const isCouncilActive = agents.some(a => 
+      a.name.toLowerCase().includes('council') || 
+      a.task?.toLowerCase().includes('council') ||
+      a.task?.toLowerCase().includes('debate')
+    );
+    if (isCouncilActive && !hasSwitchedToCouncil) {
+      setActiveRightTab('council');
+      setIsRightPanelOpen(true);
+      setHasSwitchedToCouncil(true);
+    } else if (!isCouncilActive && hasSwitchedToCouncil) {
+      setHasSwitchedToCouncil(false);
+    }
+  }, [agents, hasSwitchedToCouncil]);
+
+  // Live Data Canvas & Artifact states
+  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null);
+  const [artifactCode, setArtifactCode] = useState<string>('');
+  const [artifactTitle, setArtifactTitle] = useState<string>('');
+  const [artifactType, setArtifactType] = useState<string>('');
+  const [artifactVersion, setArtifactVersion] = useState<number>(1);
+  const [chatInputValue, setChatInputValue] = useState<string>('');
+
+  // Auto-expand to 50% split when a Canvas or Artifact becomes active
+  useEffect(() => {
+    if (activeCanvasId || activeArtifactId) {
+      setRightPanelWidth(50);
+      setIsRightPanelOpen(true);
+      if (activeCanvasId) {
+        setActiveRightTab('canvas');
+      } else {
+        setActiveRightTab('artifact');
+      }
+    }
+  }, [activeCanvasId, activeArtifactId]);
+
+  const handleOpenPreview = useCallback((code: string, title: string) => {
+    setPreviewContent(code);
+    setPreviewTitle(title);
+    setIsRightPanelOpen(true);
+    setActiveRightTab('preview');
+  }, []);
+
+  const handleNavClick = (label: string) => {
+    setActiveNavItem(label);
+    if (label === 'Chats') {
+      setSelectedAgentId(null);
+    } else if (label === 'Agents') {
+      setIsRightPanelOpen(true);
+      setActiveRightTab('agents');
+    } else if (label === 'Artifacts') {
+      setIsRightPanelOpen(true);
+      setActiveRightTab('files');
+    } else if (label === 'Memory') {
+      setIsRightPanelOpen(true);
+      setActiveRightTab('memory');
+    } else if (label === 'Connectors') {
+      // Connectors view state
+    } else if (label === 'Customize') {
+      alert("Customization option coming soon! Here you can customize system prompts and default agent behavior.");
+      setActiveNavItem('Chats');
+    }
+  };
+
+  const activeAgent = selectedAgentId
+    ? agents.find((a) => a.id === selectedAgentId)
+    : agents.find((a) => a.type === 'orchestrator');
+
+  // Fetch agents list
+  const fetchAgents = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/project/${project.id}/agents`);
+      if (response.ok) {
+        const data = await response.json();
+        setAgents(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch agents:', e);
+    }
+  }, [project.id]);
+
+  // Fetch messages for active agent
+  const fetchMessages = useCallback(async () => {
+    if (!activeAgent) return;
+    try {
+      const response = await fetch(`/api/agent/${activeAgent.id}/messages`);
+      if (response.ok) {
+        const data = await response.json();
+        setMessages(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch messages:', e);
+    }
+  }, [activeAgent]);
+
+  // Fetch messages when selected agent or active agent changes
+  useEffect(() => {
+    fetchMessages();
+  }, [selectedAgentId, activeAgent, fetchMessages]);
+
+  // Initialize data and setup Supabase realtime subscriptions
+  useEffect(() => {
+    const supabase = supabaseService.getClient();
+
+    // Subscribe to messages changes for the project
+    const messagesChannel = supabase
+      .channel(`project-messages-${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => {
+          fetchMessages();
+        }
+      )
+      .subscribe();
+
+    // Subscribe to agents changes for the project
+    const agentsChannel = supabase
+      .channel(`project-agents-${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'agents',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => {
+          fetchAgents();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(messagesChannel);
+      supabase.removeChannel(agentsChannel);
+    };
+  }, [project.id, fetchMessages, fetchAgents]);
+
+  const handleSendMessage = async (content: string, model: string, options?: any) => {
+    if (!activeAgent || activeAgent.type !== 'orchestrator') return;
+
+    setIsOrchestratorLoading(true);
+    setChatInputValue('');
+
+    // Check 1: Live Data Canvas Request Check
+    try {
+      const canvasDetectRes = await fetch('/api/canvas/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          agentId: activeAgent.id,
+          message: content,
+        }),
+      });
+
+      if (canvasDetectRes.ok) {
+        const canvasData = await canvasDetectRes.json();
+        if (canvasData.isDataRequest && canvasData.canvas) {
+          // 1. Save user message to database
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'user',
+              content,
+            }),
+          });
+
+          // 2. Set active canvas and tab
+          setActiveCanvasId(canvasData.canvas.id);
+          setIsRightPanelOpen(true);
+          setActiveRightTab('canvas');
+
+          // 3. Save initial assistant message indicating compilation
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'assistant',
+              content: `📊 **Live Data Canvas Opened**: Researching and compiling "${canvasData.canvas.name}" directly in your Right Panel.`,
+            }),
+          });
+
+          // 4. Trigger background streaming execution
+          fetch('/api/canvas/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              canvasId: canvasData.canvas.id,
+              query: content,
+              columns: canvasData.canvas.columns,
+              mode: canvasData.mode,
+              enrichmentItems: canvasData.enrichmentItems,
+              rowsTarget: canvasData.canvas.rows_target,
+            }),
+          }).catch((err) => {
+            console.error('Failed to trigger background canvas run:', err);
+          });
+
+          setIsOrchestratorLoading(false);
+          return; // Skip standard chat pipeline
+        }
+      }
+    } catch (e) {
+      console.warn('Canvas detection check failed:', e);
+    }
+
+    // Check 2: Artifact Request Check (New or Update)
+    try {
+      if (activeArtifactId && artifactCode) {
+        // This is a follow-up/update change request for the active artifact
+        // 1. Save user message to database
+        await fetch(`/api/agent/${activeAgent.id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            role: 'user',
+            content,
+          }),
+        });
+
+        setIsRightPanelOpen(true);
+        setActiveRightTab('artifact');
+
+        // Save assistant typing/loading status message
+        await fetch(`/api/agent/${activeAgent.id}/messages`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: project.id,
+            role: 'assistant',
+            content: `🎨 **Updating Artifact**: Modifying visual component "${artifactTitle}"...`,
+          }),
+        });
+
+        // Trigger update API
+        const updateRes = await fetch('/api/artifact/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            artifactId: activeArtifactId,
+            changeRequest: content,
+            currentCode: artifactCode,
+            version: artifactVersion,
+            model,
+          }),
+        });
+
+        if (updateRes.ok) {
+          const artId = updateRes.headers.get('X-Artifact-Id');
+          const nextVersion = parseInt(updateRes.headers.get('X-Artifact-Version') || String(artifactVersion + 1), 10);
+          
+          if (artId) setActiveArtifactId(artId);
+          setArtifactVersion(nextVersion);
+          setArtifactCode(''); // Clear to start streaming
+
+          const reader = updateRes.body?.getReader();
+          const decoder = new TextDecoder();
+          let accumulated = '';
+
+          if (reader) {
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const chunk = decoder.decode(value, { stream: true });
+                accumulated += chunk;
+                
+                let cleaned = accumulated.trim();
+                if (cleaned.startsWith('```html')) {
+                  cleaned = cleaned.slice(7);
+                } else if (cleaned.startsWith('```')) {
+                  cleaned = cleaned.slice(3);
+                }
+                if (cleaned.endsWith('```')) {
+                  cleaned = cleaned.slice(0, -3);
+                }
+                setArtifactCode(cleaned.trim());
+              }
+            } catch (err) {
+              console.error('Error reading artifact update stream:', err);
+            }
+          }
+
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'assistant',
+              content: `✨ **Artifact Updated**: Version ${nextVersion} of "${artifactTitle}" is ready.`,
+            }),
+          });
+        } else {
+          throw new Error('Artifact update API failed');
+        }
+
+        setIsOrchestratorLoading(false);
+        return; // Skip standard chat pipeline
+      }
+
+      // Check if it is a brand new artifact request
+      const artifactDetectRes = await fetch('/api/artifact/detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content }),
+      });
+
+      if (artifactDetectRes.ok) {
+        const artifactData = await artifactDetectRes.json();
+        if (artifactData.isArtifactRequest) {
+          // Yes! Build new artifact!
+          // 1. Save user message to database
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'user',
+              content,
+            }),
+          });
+
+          setIsRightPanelOpen(true);
+          setActiveRightTab('artifact');
+
+          // Save assistant loading message
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'assistant',
+              content: `🎨 **Building Artifact**: Generating visual component "${artifactData.title}"...`,
+            }),
+          });
+
+          // Trigger generate API
+          const genRes = await fetch('/api/artifact/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              agentId: activeAgent.id,
+              prompt: content,
+              type: artifactData.type,
+              title: artifactData.title,
+              model,
+            }),
+          });
+
+          if (genRes.ok) {
+            const artId = genRes.headers.get('X-Artifact-Id');
+            const title = genRes.headers.get('X-Artifact-Title') || artifactData.title;
+            const type = genRes.headers.get('X-Artifact-Type') || artifactData.type;
+            const version = parseInt(genRes.headers.get('X-Artifact-Version') || '1', 10);
+
+            if (artId) setActiveArtifactId(artId);
+            if (title) setArtifactTitle(title);
+            if (type) setArtifactType(type);
+            setArtifactVersion(version);
+            setArtifactCode(''); // Clear to start streaming
+
+            const reader = genRes.body?.getReader();
+            const decoder = new TextDecoder();
+            let accumulated = '';
+
+            if (reader) {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  const chunk = decoder.decode(value, { stream: true });
+                  accumulated += chunk;
+                  
+                  let cleaned = accumulated.trim();
+                  if (cleaned.startsWith('```html')) {
+                    cleaned = cleaned.slice(7);
+                  } else if (cleaned.startsWith('```')) {
+                    cleaned = cleaned.slice(3);
+                  }
+                  if (cleaned.endsWith('```')) {
+                    cleaned = cleaned.slice(0, -3);
+                  }
+                  setArtifactCode(cleaned.trim());
+                }
+              } catch (err) {
+                console.error('Error reading artifact generate stream:', err);
+              }
+            }
+
+            await fetch(`/api/agent/${activeAgent.id}/messages`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                projectId: project.id,
+                role: 'assistant',
+                content: `✨ **Artifact Generated**: Component "${title}" is ready and interactive in your Artifact tab.`,
+              }),
+            });
+          } else {
+            throw new Error('Artifact generation API failed');
+          }
+
+          setIsOrchestratorLoading(false);
+          return; // Skip standard chat pipeline
+        }
+      }
+    } catch (e) {
+      console.warn('Artifact detection check failed:', e);
+    }
+
+    // Default chat completion pipeline fallback
+    try {
+      // 1. Save user message to database
+      const saveRes = await fetch(`/api/agent/${activeAgent.id}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          role: 'user',
+          content,
+        }),
+      });
+
+      if (!saveRes.ok) throw new Error('Failed to save message');
+
+      // 2. Set orchestrator agent status to running
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'running' }),
+      });
+
+      // 3. Trigger chat completion stream
+      const chatRes = await fetch('/api/orchestrator/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          agentId: activeAgent.id,
+          model,
+          options,
+        }),
+      });
+
+      if (!chatRes.ok) throw new Error('Chat generation failed');
+
+      // Consume stream to wait for completion
+      if (chatRes.body) {
+        const reader = chatRes.body.getReader();
+        while (true) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      }
+
+      // 4. Update status back to done
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'done' }),
+      });
+
+    } catch (e) {
+      console.error('Error sending message:', e);
+      // Mark as error status
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'error' }),
+      });
+    } finally {
+      setIsOrchestratorLoading(false);
+    }
+  };
+
+  const handleSelectPreset = (preset: any) => {
+    setChatInputValue(preset.prompt);
+    setActiveNavItem('Chats');
+  };
+
+  return (
+    <div className="flex w-screen h-screen overflow-hidden bg-canvas">
+      {/* 1. Left Sidebar */}
+      <Sidebar
+        projects={allProjects}
+        activeProjectId={project.id}
+        isCollapsed={isSidebarCollapsed}
+        setIsCollapsed={setIsSidebarCollapsed}
+        activeNavItem={activeNavItem}
+        onNavClick={handleNavClick}
+      />
+
+      {/* Main Workspace Frame */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Top Header Bar */}
+        <header className="h-12 border-b border-hairline bg-canvas flex items-center justify-between px-4 shrink-0 select-none">
+          <div className="flex items-center gap-2 min-w-0">
+            <h1 className="font-lora font-normal text-base text-ink tracking-tight shrink-0">
+              {project.name}
+            </h1>
+            
+            <span className="text-muted select-none text-xs px-0.5 shrink-0">/</span>
+
+            <AgentBreadcrumb
+              agents={agents}
+              selectedAgentId={selectedAgentId}
+              onSelectAgent={setSelectedAgentId}
+              isHeaderMode={true}
+            />
+
+            {activeConnectorsCount > 0 && (
+              <>
+                <span className="text-muted select-none text-xs px-0.5 shrink-0">/</span>
+                <span className="text-[10px] bg-[#EBE5DC]/55 text-muted border border-hairline/70 font-mono px-2.5 py-0.5 rounded-full shrink-0">
+                  {activeConnectorsCount} connector{activeConnectorsCount > 1 ? 's' : ''} active
+                </span>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <button type="button" className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-muted hover:text-ink hover:bg-surface-card rounded-lg transition-colors cursor-pointer font-semibold border border-hairline bg-canvas shadow-2xs">
+              <Share2 className="w-3.5 h-3.5" />
+              <span>Share</span>
+            </button>
+            <button type="button" className="p-1.5 hover:bg-surface-cream-strong rounded-lg text-muted hover:text-ink transition-colors cursor-pointer">
+              <Settings className="w-4.5 h-4.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRightPanelOpen(!isRightPanelOpen)}
+              className={`p-1.5 hover:bg-surface-cream-strong rounded-lg text-muted hover:text-ink transition-colors cursor-pointer border border-hairline shadow-2xs ${
+                isRightPanelOpen ? 'bg-surface-cream-strong text-ink' : 'bg-canvas'
+              }`}
+              title={isRightPanelOpen ? "Hide workspace panel" : "Show workspace panel"}
+            >
+              <PanelRight className="w-4 h-4" />
+            </button>
+          </div>
+        </header>
+
+        {/* 2. Middle Chat Panel */}
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          {activeNavItem === 'Connectors' ? (
+            <ConnectorsPage />
+          ) : activeAgent && activeAgent.type === 'subagent' ? (
+            <AgentChat
+              agent={activeAgent}
+              messages={messages}
+              onOpenPreview={handleOpenPreview}
+            />
+          ) : activeAgent ? (
+            <OrchestratorChat
+              messages={messages}
+              isLoading={isOrchestratorLoading || activeAgent.status === 'running'}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              onSubmit={handleSendMessage}
+              projectId={project.id}
+              onOpenPreview={handleOpenPreview}
+              onFileUploaded={(text, filename) => {
+                setProject(prev => ({
+                  ...prev,
+                  master_resume: text,
+                  master_resume_filename: filename
+                }));
+              }}
+              inputValue={chatInputValue}
+              onInputValueChange={setChatInputValue}
+              activeCanvasId={activeCanvasId}
+              activeArtifactId={activeArtifactId}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center text-sm text-[#8A8780] italic">
+              Loading agent...
+            </div>
+          )}
+
+          {/* 3. Right Sidebar Panel */}
+          <RightPanel
+            project={project}
+            agents={agents}
+            selectedAgentId={selectedAgentId}
+            onSelectAgent={setSelectedAgentId}
+            isOpen={isRightPanelOpen}
+            setIsOpen={setIsRightPanelOpen}
+            activeTab={activeRightTab}
+            onTabChange={setActiveRightTab}
+            onProjectUpdate={setProject}
+            previewContent={previewContent}
+            previewTitle={previewTitle}
+            activeCanvasId={activeCanvasId}
+            activeArtifactId={activeArtifactId}
+            artifactCode={artifactCode}
+            artifactTitle={artifactTitle}
+            artifactType={artifactType}
+            artifactVersion={artifactVersion}
+            onSelectPreset={handleSelectPreset}
+            panelWidth={rightPanelWidth}
+            onPanelWidthChange={handlePanelWidthChange}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
