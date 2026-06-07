@@ -175,7 +175,19 @@ export const orchestratorService = {
     }
   },
 
-  async planManagerAgents(goal: string, model: string, projectId?: string, options?: any): Promise<{ summary: string; managers: { name: string; role: string; task: string }[] }> {
+  async planManagerAgents(
+    goal: string, 
+    model: string, 
+    projectId?: string, 
+    options?: any
+  ): Promise<{ 
+    intent: string; 
+    complexity: string; 
+    route: string; 
+    councilRequired: boolean; 
+    summary: string; 
+    managers: { name: string; role: string; task: string }[] 
+  }> {
     let toolContext = "";
     try {
       const goalLower = goal.toLowerCase();
@@ -234,26 +246,48 @@ export const orchestratorService = {
       console.error("Error gathering root orchestrator tool context:", err);
     }
 
-    const systemPrompt = `You are the Root Orchestrator of 3RDMIND. Your task is to analyze the user's goal.
-If the goal is a casual conversation, a greeting, hello (e.g., "hii", "hello", "hey"), or general query that can be answered directly using the provided tool context, return an empty "managers" array and place your direct, comprehensive response (incorporating search/tool results) in the "summary" field.
+    const systemPrompt = `You are the Intent Router and Root Orchestrator of 3RDMIND.
+Analyze the user's goal: "${goal}"
 
-Otherwise, if it requires planning a workflow, plan 2 to 4 specialized L2 Manager Agents. Each manager agent will coordinate a section of the project.
+First, classify the intent and assess the complexity to make a routing decision:
+1. "Direct Conversation" Mode:
+   - For greetings (e.g. "hi", "hello", "thanks"), casual conversation, simple questions, or basic acknowledgements.
+   - Set route to "Direct Conversation", complexity to "Low", councilRequired to false.
+   - Place your direct, friendly, and complete response in the "summary" field.
+   - Return an empty "managers" array.
 
-If the user request asks for a debate, consensus, panel, or council discussion on a topic, make sure to plan an L2 manager agent whose name ends with "Council" (e.g. "TechCouncil", "StrategyCouncil", "DesignCouncil") and specify in its task that it must convene a debate among specialized council seats to reconcile different viewpoints.
+2. "Specialist" Mode:
+   - For writing, coding, translation, summarization, or simple focused tasks.
+   - Set route to "Specialist", complexity to "Low" or "Medium", councilRequired to false.
+   - Plan exactly 1 specialist manager agent in the "managers" array.
+
+3. "Analysis" Mode:
+   - For evaluations, comparisons, reviews, or lightweight research.
+   - Set route to "Analysis", complexity to "Medium", councilRequired to false.
+   - Plan 2 to 3 manager agents in the "managers" array.
+
+4. "Council" Mode:
+   - For strategic planning, business decisions, market research, architecture decisions, roadmaps, investment analysis, or multi-perspective reasoning.
+   - Set route to "Council", complexity to "High", councilRequired to true.
+   - Plan exactly 1 L2 manager agent in the "managers" array whose name ends with "Council" (e.g. "TechCouncil", "StrategyCouncil", "DesignCouncil") and whose role is "Council Chamber".
 
 You must return your response ONLY as a raw JSON object with the following structure:
 {
-  "summary": "Your direct response to the user incorporating tool/search results (if no managers needed), OR a concise summary of the orchestration plan.",
+  "intent": "Intent classification here",
+  "complexity": "Low" | "Medium" | "High",
+  "route": "Direct Conversation" | "Specialist" | "Analysis" | "Council",
+  "councilRequired": true | false,
+  "summary": "Direct response (if Direct Conversation mode), OR a concise summary of the planned managers.",
   "managers": [
     {
-      "name": "Creative name for the manager agent (e.g. StrategyManager, BrandManager)",
-      "role": "Functional role of the manager (e.g. Campaign Strategist, Creative Director)",
+      "name": "Creative name for the manager agent",
+      "role": "Functional role of the manager",
       "task": "A detailed, descriptive instruction of what this manager needs to deliver."
     }
   ]
 }
 
-Respond ONLY with the raw JSON. Do not include markdown code block formatting (no \`\`\`json).`;
+Respond ONLY with raw JSON. Do not include markdown code block formatting (no \`\`\`json).`;
 
     const userMessage = { role: 'user', content: `Goal: "${goal}"${toolContext ? `\n\nRetrieved Tool/Search Context:\n${toolContext}` : ''}` };
     const selectedModel = model || DEFAULT_ORCHESTRATOR_MODEL;
@@ -269,18 +303,18 @@ Respond ONLY with the raw JSON. Do not include markdown code block formatting (n
     } catch (e) {
       console.error('Failed to parse manager plan JSON response:', responseText, e);
       // Fallback manager plan
+      const isGreeting = ["hi", "hello", "hey", "thanks", "thank you", "proceed"].includes(goal.toLowerCase().trim());
       return {
-        summary: 'Recursive strategy to achieve the user goal.',
-        managers: [
+        intent: isGreeting ? 'Greeting' : 'Strategic Planning',
+        complexity: isGreeting ? 'Low' : 'High',
+        route: isGreeting ? 'Direct Conversation' : 'Council',
+        councilRequired: !isGreeting,
+        summary: isGreeting ? 'Hello! How can I help you today?' : 'Recursive strategy to achieve the user goal.',
+        managers: isGreeting ? [] : [
           {
-            name: 'StrategyManager',
-            role: 'Campaign strategist',
-            task: `Formulate a general campaign overview for: "${goal}"`
-          },
-          {
-            name: 'ExecutionManager',
-            role: 'Content developer',
-            task: `Draft the essential copy and implementation elements for: "${goal}"`
+            name: 'Strategy Council',
+            role: 'Council Chamber',
+            task: `Formulate a general campaign overview and strategic plan for: "${goal}"`
           }
         ]
       };
@@ -296,6 +330,25 @@ Respond ONLY with the raw JSON. Do not include markdown code block formatting (n
       await this.executeManagerDirectly(managerAgent, projectId, selectedModel);
       return;
     }
+
+    // Determine if this manager is the Root Council
+    let councilRequired = false;
+    try {
+      const agents = await agentService.getProjectAgents(projectId);
+      const orchestratorAgent = agents.find(a => a.type === 'orchestrator');
+      if (orchestratorAgent && orchestratorAgent.summary) {
+        const metadata = JSON.parse(orchestratorAgent.summary);
+        councilRequired = !!metadata.councilRequired;
+      }
+    } catch (e) {
+      console.warn("Failed to check councilRequired in dispatchManager:", e);
+    }
+
+    const isCouncil = councilRequired &&
+                      managerAgent.depth === 2 &&
+                      (managerAgent.name.toLowerCase().includes('council') ||
+                       managerAgent.task?.toLowerCase().includes('council') ||
+                       managerAgent.task?.toLowerCase().includes('debate'));
 
     // 2. Query manager to decide: executor or manager mode
     const systemPrompt = `You are ${managerAgent.name}, an L2 Manager Agent with the role: ${managerAgent.role}.
@@ -326,22 +379,35 @@ For manager mode:
 
 Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
 
+    let decision;
+    let responseText = "";
+
     try {
-      const responseText = await openrouterService.callModel(systemPrompt, [], selectedModel, managerAgent.id);
-      
-      let decision;
-      try {
-        let cleaned = responseText.trim();
-        if (cleaned.startsWith('```')) {
-          cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
-        }
-        decision = JSON.parse(cleaned);
-      } catch (e) {
-        console.error('Decision parse failed, falling back to executor mode:', responseText, e);
+      if (isCouncil) {
         decision = {
-          mode: 'executor',
-          result: responseText
+          mode: 'manager',
+          agents: [
+            { name: 'Creative Seat', role: 'Creative Specialist', task: `Collaborate and propose creative strategies for: "${managerAgent.task}"` },
+            { name: 'Critic Seat', role: 'Critical Analyst', task: `Collaborate and critique ideas for: "${managerAgent.task}"` },
+            { name: 'Auditor Seat', role: 'Feasibility/Resource Auditor', task: `Collaborate and audit resource viability for: "${managerAgent.task}"` },
+            { name: 'General Seat', role: 'General Coordinator', task: `Collaborate and align operational constraints for: "${managerAgent.task}"` }
+          ]
         };
+      } else {
+        responseText = await openrouterService.callModel(systemPrompt, [], selectedModel, managerAgent.id);
+        try {
+          let cleaned = responseText.trim();
+          if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+          }
+          decision = JSON.parse(cleaned);
+        } catch (e) {
+          console.error('Decision parse failed, falling back to executor mode:', responseText, e);
+          decision = {
+            mode: 'executor',
+            result: responseText
+          };
+        }
       }
 
       if (decision.mode === 'executor') {
@@ -363,10 +429,6 @@ Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
         const subAgentsPlanned = decision.agents || [];
         const spawnedChildren = [];
         
-        const isCouncil = managerAgent.name.toLowerCase().includes('council') ||
-                          managerAgent.task?.toLowerCase().includes('council') ||
-                          managerAgent.task?.toLowerCase().includes('debate');
-
         const councilModels = [
           'google/gemini-2.5-pro',
           'openai/gpt-4o',
@@ -909,7 +971,23 @@ Provide your detailed output directly.`;
                               parentAgent.task?.toLowerCase().includes('council') ||
                               parentAgent.task?.toLowerCase().includes('debate');
 
-      if (parentIsCouncil) {
+      const isExecutionTask = executorAgent.role === 'Execution Task' || executorAgent.name.startsWith('Task:');
+
+      if (parentIsCouncil && isExecutionTask) {
+        try {
+          const siblings = await agentService.getAgentChildren(parentAgent.id);
+          const verdictAgent = siblings.find(s => s.name === 'Verdict' && s.status === 'done');
+          if (verdictAgent) {
+            const messages = await messageService.getAgentMessages(verdictAgent.id);
+            const lastAssistantResponse = messages.reverse().find(m => m.role === 'assistant');
+            if (lastAssistantResponse) {
+              toolContext += `\n\n[FINAL COUNCIL VERDICT]\nThe AI Council has reached consensus and delivered this verdict. Use these findings and guidelines to execute your specific task:\n\n${lastAssistantResponse.content}\n`;
+            }
+          }
+        } catch (err) {
+          console.error("Error gathering final verdict for execution task in dispatchExecutor:", err);
+        }
+      } else if (parentIsCouncil) {
         try {
           const siblings = await agentService.getAgentChildren(parentAgent.id);
           let siblingsOutput = "";
@@ -1047,6 +1125,144 @@ Provide your response directly. Keep it structured and high quality.`;
   async synthesizeManager(managerAgent: Agent, projectId: string, selectedModel: string): Promise<string> {
     const children = await agentService.getAgentChildren(managerAgent.id);
     
+    // Determine if this manager is the Root Council
+    let councilRequired = false;
+    try {
+      const agents = await agentService.getProjectAgents(projectId);
+      const orchestratorAgent = agents.find(a => a.type === 'orchestrator');
+      if (orchestratorAgent && orchestratorAgent.summary) {
+        const metadata = JSON.parse(orchestratorAgent.summary);
+        councilRequired = !!metadata.councilRequired;
+      }
+    } catch (e) {
+      console.warn("Failed to check councilRequired in synthesizeManager:", e);
+    }
+
+    const isCouncil = councilRequired &&
+                      managerAgent.depth === 2 &&
+                      (managerAgent.name.toLowerCase().includes('council') ||
+                       managerAgent.task?.toLowerCase().includes('council') ||
+                       managerAgent.task?.toLowerCase().includes('debate'));
+
+    // Stage 1: If it's a council and no execution tasks have been spawned yet, spawn them.
+    if (isCouncil) {
+      const executionTasks = children.filter(c => c.role === 'Execution Task' || c.name.startsWith('Task:'));
+      if (executionTasks.length === 0) {
+        const verdictAgent = children.find(c => c.name === 'Verdict');
+        let verdictContent = "";
+        if (verdictAgent) {
+          const msgs = await messageService.getAgentMessages(verdictAgent.id);
+          const lastResponse = msgs.reverse().find(m => m.role === 'assistant');
+          verdictContent = lastResponse?.content || "";
+        }
+
+        await messageService.saveMessage(
+          managerAgent.id,
+          projectId,
+          'assistant',
+          `*AI Council Verdict reached. Generating execution tasks to implement the verdict...*`
+        );
+
+        const generateTasksPrompt = `You are the Root Council Manager.
+You have just received the final consensus, dissent, and recommendations from the AI Council.
+Based on the council's verdict, you must formulate exactly 2 to 3 concrete, actionable execution tasks to realize the recommendations.
+Each task must be assigned to a specific specialist role and have a clear, actionable description.
+
+You must return your response ONLY as a raw JSON object with the following structure:
+{
+  "tasks": [
+    {
+      "name": "Task: Create GTM Roadmap",
+      "role": "Execution Task",
+      "task": "A detailed, descriptive instruction of what this execution task must perform."
+    }
+  ]
+}
+
+Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
+
+        const messages = [
+          {
+            role: 'user',
+            content: `Council Verdict:\n${verdictContent}\n\nGenerate the execution tasks JSON:`
+          }
+        ];
+
+        let executionTasksPlanned: { name: string; role: string; task: string }[] = [];
+        try {
+          const responseText = await openrouterService.callModel(generateTasksPrompt, messages, selectedModel, managerAgent.id);
+          let cleaned = responseText.trim();
+          if (cleaned.startsWith('```')) {
+            cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
+          }
+          const parsed = JSON.parse(cleaned);
+          executionTasksPlanned = parsed.tasks || [];
+        } catch (err) {
+          console.error("Failed to plan execution tasks, using fallback:", err);
+          executionTasksPlanned = [
+            {
+              name: "Task: Design Implementation Strategy",
+              role: "Execution Task",
+              task: `Detail the specific action steps and implementation timeline based on the council verdict: "${verdictContent.slice(0, 200)}..."`
+            },
+            {
+              name: "Task: Execute GTM Roadmap",
+              role: "Execution Task",
+              task: `Create a concrete GTM strategy and roadmap based on the council verdict: "${verdictContent.slice(0, 200)}..."`
+            }
+          ];
+        }
+
+        // Ensure we actually planned some tasks
+        if (executionTasksPlanned.length === 0) {
+          executionTasksPlanned = [
+            {
+              name: "Task: Action Plan Design",
+              role: "Execution Task",
+              task: "Detail the specific action steps and implementation roadmap based on the council verdict."
+            }
+          ];
+        }
+
+        // Update parent agent children_count
+        await agentService.updateAgent(managerAgent.id, {
+          children_count: managerAgent.children_count + executionTasksPlanned.length
+        });
+
+        await messageService.saveMessage(
+          managerAgent.id,
+          projectId,
+          'assistant',
+          `Spawning ${executionTasksPlanned.length} execution tasks based on the council's verdict.`
+        );
+
+        const spawnedTasks = [];
+        for (const taskPlan of executionTasksPlanned) {
+          const childAgent = await agentService.createAgent(
+            projectId,
+            taskPlan.name,
+            "Execution Task", // Set role strictly to Execution Task
+            taskPlan.task,
+            'subagent',
+            DEFAULT_SUB_AGENT_MODEL,
+            managerAgent.id,
+            managerAgent.depth + 1, // L3 depth
+            'executor',
+            2000
+          );
+          spawnedTasks.push(childAgent);
+        }
+
+        // Dispatch in parallel
+        await Promise.all(
+          spawnedTasks.map(taskAgent => this.dispatchExecutor(taskAgent, managerAgent, selectedModel))
+        );
+
+        return "Spawning execution tasks";
+      }
+    }
+
+    // Stage 2: Synthesis after all sub-agents (and execution tasks if applicable) are finished.
     let subOutputs = '';
     for (const child of children) {
       const messages = await messageService.getAgentMessages(child.id);
@@ -1056,25 +1272,45 @@ Provide your response directly. Keep it structured and high quality.`;
       subOutputs += `Output:\n${lastAssistantResponse?.content || 'No output.'}\n\n`;
     }
 
-    const systemPrompt = `You are ${managerAgent.name}, a Manager Agent. Your sub-agents have completed their tasks.
+    let systemPrompt = "";
+    let messages = [];
+
+    if (isCouncil) {
+      systemPrompt = `You are the Root Council Manager. Your debate seats, verdict agent, consensus matrix, and execution tasks have all completed.
+Your original task was: ${managerAgent.task}
+
+You must synthesize their outputs into a single, cohesive, publication-grade executive report.
+The report MUST contain two main sections:
+1. AI COUNCIL VERDICT (Summarizing the consensus, dissent, and final recommendations).
+2. CONSTRUCTIVE IMPLEMENTATION PLAN (Integrating the results of the execution tasks into a clear roadmap).
+
+Use beautiful markdown formatting. Keep the off-white/beige aesthetic in mind (e.g. clean structured tables, blockquotes, clear headings).`;
+      messages = [
+        {
+          role: 'user',
+          content: `All council outputs and execution task results:\n${subOutputs}\n\nProvide the final synthesized AI Council Verdict and Constructive Implementation Plan report:`
+        }
+      ];
+    } else {
+      systemPrompt = `You are ${managerAgent.name}, a Manager Agent. Your sub-agents have completed their tasks.
 Your task was: ${managerAgent.task}
 
 You must synthesize their outputs into a single, cohesive, high-quality output for your parent orchestrator.
 Use beautiful markdown formatting.`;
-
-    const messages = [
-      {
-        role: 'user',
-        content: `Sub-agent outputs:\n${subOutputs}\n\nProvide the synthesis:`
-      }
-    ];
+      messages = [
+        {
+          role: 'user',
+          content: `Sub-agent outputs:\n${subOutputs}\n\nProvide the synthesis:`
+        }
+      ];
+    }
 
     // Inform manager chat that we are starting synthesis
     const tempMsg = await messageService.saveMessage(
       managerAgent.id,
       projectId,
       'assistant',
-      `*Synthesizing L3 executor outputs...*`
+      `*Synthesizing sub-agent outputs...*`
     );
 
     const synthesis = await openrouterService.callModel(systemPrompt, messages, selectedModel, managerAgent.id);
@@ -1138,11 +1374,15 @@ Use beautiful markdown formatting.`;
       }
     }
 
-    const systemPrompt = `You are 3RDMIND, the Lead Orchestrator. The manager agents and their sub-agents have completed their tasks.
+    const systemPrompt = `You are 3RDMIND, the Lead Orchestrator. The AI Council, manager agents, and sub-agents have completed their tasks.
 Your original goal was: "${project.goal}"
 
-Synthesize all the manager summaries and detailed sub-agent outputs into a final cohesive campaign/solution report for the user.
-Ensure that you incorporate the specific deliverables, metrics, and details provided by the sub-agents so no details are lost.
+Synthesize all the outputs into a single cohesive, premium final report for the user.
+If a council was run, your final report must include:
+1. Executive Summary & AI Council Verdict (Consensus, Dissent, Final Recommendations).
+2. Constructive Implementation Plan (Roadmap and actionable tasks completed).
+
+Ensure that you incorporate the specific details, metrics, and deliverables from the execution tasks and sub-agents so no details are lost.
 Deliver a premium, publication-grade markdown document.`;
 
     const messages = [

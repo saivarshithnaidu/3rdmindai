@@ -64,42 +64,73 @@ export async function POST(req: NextRequest) {
     // 1. Plan L2 managers synchronously so we can return them
     const plan = await orchestratorService.planManagerAgents(goal, selectedModel, projectId, options);
 
-    if (plan.managers && plan.managers.length > 0) {
-      // Save plan message in orchestrator chat
-      await messageService.saveMessage(
-        orchestrator.id,
-        projectId,
-        'assistant',
-        `**Workflow Plan Created**\n\n${plan.summary}\n\nSpawning ${plan.managers.length} L2 Manager agents.`
-      );
+    // Save Intent Router metadata inside orchestrator summary field
+    await agentService.updateAgent(orchestrator.id, {
+      summary: JSON.stringify({
+        intent: plan.intent || 'General Inquiry',
+        complexity: plan.complexity || 'Low',
+        route: plan.route || 'Direct Conversation',
+        councilRequired: plan.councilRequired || false
+      })
+    });
 
-      // 2. Spawn L2 manager agents
+    if (plan.route !== 'Direct Conversation' && plan.managers && plan.managers.length > 0) {
       const spawnedManagers = [];
-      for (const managerPlan of plan.managers) {
-        let managerName = managerPlan.name;
-        let managerTask = managerPlan.task;
-        if (options?.councilMode) {
-          if (!managerName.toLowerCase().includes('council')) {
-            managerName = `${managerName} Council`;
-          }
-          if (!managerTask.toLowerCase().includes('debate')) {
-            managerTask = `[AI Council Mode Active] Convene a multi-model debate/consensus panel. ${managerTask}`;
-          }
+      const isCouncilMode = plan.councilRequired || options?.councilMode;
+
+      if (isCouncilMode) {
+        // Spawn EXACTLY ONE Root Council manager
+        const firstPlan = plan.managers[0];
+        let managerName = firstPlan.name;
+        if (!managerName.toLowerCase().includes('council')) {
+          managerName = `${managerName} Council`;
         }
+
+        // Save plan message in orchestrator chat
+        await messageService.saveMessage(
+          orchestrator.id,
+          projectId,
+          'assistant',
+          `**Root AI Council Convened**\n\nConvene the multi-model AI Council for strategic reasoning on: "${goal}".`
+        );
 
         const managerAgent = await agentService.createAgent(
           projectId,
           managerName,
-          managerPlan.role,
-          managerTask,
+          firstPlan.role || 'Council Chamber',
+          `[AI Council Mode Active] Convene a multi-model debate/consensus panel to analyze: "${goal}"`,
           'subagent',
           selectedModel,
           orchestrator.id,
           2, // L2 Depth
-          'executor', // Initially set to executor, decisions will toggle
+          'executor', // Starts as executor, decision logic will route to manager
           4000 // Manager budget
         );
         spawnedManagers.push(managerAgent);
+      } else {
+        // Spawn standard L2 agents for Specialist / Analysis modes
+        await messageService.saveMessage(
+          orchestrator.id,
+          projectId,
+          'assistant',
+          `**Workflow Plan Created**\n\n${plan.summary}\n\nSpawning ${plan.managers.length} L2 Manager agents.`
+        );
+
+        for (const managerPlan of plan.managers) {
+          const managerAgent = await agentService.createAgent(
+            projectId,
+            managerPlan.name,
+            managerPlan.role,
+            managerPlan.task,
+            'subagent',
+            selectedModel,
+            orchestrator.id,
+            2, // L2 Depth
+            'executor', // Starts as executor, decisions will toggle
+            4000 // Manager budget
+          );
+          spawnedManagers.push(managerAgent);
+        }
       }
 
       // 3. Dispatch each L2 manager agent in parallel asynchronously

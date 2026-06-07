@@ -192,11 +192,24 @@ export default function RightPanel({
   const subAgentsCount = agents.filter(a => a.type === 'subagent').length;
   const orchestratorAgent = agents.find(a => a.type === 'orchestrator');
 
-  const isCouncilActive = agents.some(a => 
-    a.name.toLowerCase().includes('council') || 
-    a.task?.toLowerCase().includes('council') ||
-    a.task?.toLowerCase().includes('debate')
-  );
+  const routerMetadata = React.useMemo(() => {
+    if (orchestratorAgent && orchestratorAgent.summary) {
+      try {
+        return JSON.parse(orchestratorAgent.summary);
+      } catch (e) {
+        // Ignore
+      }
+    }
+    return null;
+  }, [orchestratorAgent]);
+
+  const isCouncilActive = routerMetadata
+    ? routerMetadata.councilRequired
+    : agents.some(a => 
+        a.name.toLowerCase().includes('council') || 
+        a.task?.toLowerCase().includes('council') ||
+        a.task?.toLowerCase().includes('debate')
+      );
 
   const sqlMigrationCode = `ALTER TABLE projects 
   ADD COLUMN IF NOT EXISTS master_resume TEXT,
@@ -824,6 +837,27 @@ export default function RightPanel({
                     <div className="w-5 h-5 rounded-full border border-[#7B61FF] bg-white flex items-center justify-center text-[7px] font-bold text-[#7B61FF]">VE</div>
                     <span className="text-[6.5px] font-mono font-bold text-[#7B61FF] mt-0.5">Verdict</span>
                   </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Council Memory Section */}
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-2.5 select-text">
+              <span className="text-[8px] font-bold text-[#8e8b82] uppercase tracking-wider block font-mono">
+                Persistent Council Memory
+              </span>
+              <div className="space-y-1.5 text-[10px] font-mono">
+                <div className="flex items-center justify-between p-2 rounded bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                  <span className="font-bold text-[#141413]">SaaS Council</span>
+                  <span className="text-[#5db872] font-semibold">94% Consensus</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                  <span className="font-bold text-[#141413]">Marketing GTM Council</span>
+                  <span className="text-[#5db872] font-semibold">91% Consensus</span>
+                </div>
+                <div className="flex items-center justify-between p-2 rounded bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                  <span className="font-bold text-[#141413]">Growth Strategy Council</span>
+                  <span className="text-[#5db872] font-semibold">88% Consensus</span>
                 </div>
               </div>
             </div>

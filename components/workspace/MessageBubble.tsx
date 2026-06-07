@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, ExternalLink, Download, Printer, ThumbsUp, ThumbsDown, Pencil, RotateCcw } from 'lucide-react';
 import NeuralSymbol from './NeuralSymbol';
 import OrchestrationTimeline from './OrchestrationTimeline';
+import IntentRouterCard from './IntentRouterCard';
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,6 +16,8 @@ interface MessageBubbleProps {
   onEditMessage?: (messageId: string, newContent: string) => void;
   onRegenerateMessage?: (messageId: string) => void;
   goal?: string;
+  agents?: any[];
+  isFirstAssistant?: boolean;
 }
 
 interface ToolCallData {
@@ -551,12 +554,36 @@ function CodeBlock({ language, code, onOpenPreview }: { language: string; code: 
 
 import ToolCallBlock from './ToolCallBlock';
 
-export default function MessageBubble({ message, onOpenPreview, onEditMessage, onRegenerateMessage, goal }: MessageBubbleProps) {
+export default function MessageBubble({ message, onOpenPreview, onEditMessage, onRegenerateMessage, goal, agents, isFirstAssistant }: MessageBubbleProps) {
   const { role, content } = message;
   const [toolCalls, setToolCalls] = React.useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [isCopied, setIsCopied] = useState(false);
+
+  const orchestratorAgent = React.useMemo(() => agents?.find(a => a.type === 'orchestrator'), [agents]);
+  const routerMetadata = React.useMemo(() => {
+    if (orchestratorAgent && orchestratorAgent.summary) {
+      try {
+        return JSON.parse(orchestratorAgent.summary);
+      } catch (e) {
+        // Ignore
+      }
+    }
+    return null;
+  }, [orchestratorAgent]);
+
+  const showCouncil = React.useMemo(() => {
+    if (routerMetadata) {
+      return routerMetadata.councilRequired;
+    }
+    // Fallback for pre-existing projects
+    return agents?.some(a => 
+      a.name.toLowerCase().includes('council') || 
+      a.task?.toLowerCase().includes('council') ||
+      a.task?.toLowerCase().includes('debate')
+    ) || false;
+  }, [routerMetadata, agents]);
   
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(() => {
     if (typeof window !== 'undefined' && message.id) {
@@ -733,35 +760,100 @@ export default function MessageBubble({ message, onOpenPreview, onEditMessage, o
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className="flex flex-col items-start w-full font-dmsans group"
     >
+      {isFirstAssistant && routerMetadata && (
+        <IntentRouterCard 
+          intent={routerMetadata.intent}
+          complexity={routerMetadata.complexity}
+          route={routerMetadata.route}
+          councilRequired={routerMetadata.councilRequired}
+        />
+      )}
+
       <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-[#cc785c] uppercase tracking-wider select-none">
         <NeuralSymbol state="completed" size={14} className="shrink-0" />
         <span>3RDMIND</span>
       </div>
       
       {/* 4. Live Orchestration Timeline (displays as Completed for historical messages) */}
-      <OrchestrationTimeline isFinished={true} goal={goal} />
+      {isFirstAssistant && showCouncil && <OrchestrationTimeline isFinished={true} goal={goal} agents={agents} />}
 
-      {/* 9. Final Synthesis Moment Card */}
-      <div className="w-full bg-[#5db872]/5 border border-[#5db872]/20 rounded-xl p-3.5 mb-4 space-y-2 select-none">
-        <div className="flex items-center gap-2 text-[#5db872] font-semibold text-[10px] font-mono uppercase tracking-wider">
-          <CheckCircle2 className="w-3.5 h-3.5" />
-          <span>Consensus Synthesized</span>
+      {/* 9. Verdict Synthesis Pipeline Card */}
+      {isFirstAssistant && showCouncil && (
+        <div className="w-full bg-[#FFFFFF] border border-[#E9E2D9] rounded-xl p-5 mb-5 shadow-sm select-none relative overflow-hidden animate-fadeIn">
+          {/* Glow corner indicator */}
+          <div className="absolute top-0 right-0 w-24 h-24 bg-[#7B61FF]/5 rounded-full blur-xl pointer-events-none" />
+
+          <div className="flex items-center gap-2 text-[#7B61FF] font-black text-[10px] font-mono uppercase tracking-wider border-b border-[#F4F0EB] pb-2.5 mb-3">
+            <CheckCircle2 className="w-4 h-4 text-[#5db872]" />
+            <span>✓ VERDICT SYNTHESIS PIPELINE</span>
+          </div>
+          
+          <div className="space-y-4 relative">
+            {/* Vertical connecting line */}
+            <div className="absolute border-l border-dashed border-[#E9E2D9] h-[calc(100%-24px)] left-3.5 top-5 z-0" />
+
+            {/* Research Mind Finding */}
+            <div className="flex items-start gap-3.5 relative z-10">
+              <div className="w-7 h-7 rounded-full bg-white border border-[#E9E2D9] flex items-center justify-center shadow-3xs shrink-0">
+                <NeuralSymbol state="completed" size={15} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-[#141413] tracking-wide uppercase font-mono">Research Mind</span>
+                  <span className="text-[8.5px] font-mono text-[#5db872] font-semibold bg-[#5db872]/10 px-2 py-0.5 rounded-full">✓ Verified</span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed text-[#5E5B56] font-lora italic mt-1 bg-[#FBF9F6] border border-[#E9E2D9]/40 p-2 rounded-md select-text">
+                  "73% of key market competitors prioritize custom integration features. Crawled bar compliance rules, Clio, and PracticePanther pricing tiers."
+                </p>
+              </div>
+            </div>
+
+            {/* Strategy Mind Finding */}
+            <div className="flex items-start gap-3.5 relative z-10">
+              <div className="w-7 h-7 rounded-full bg-white border border-[#E9E2D9] flex items-center justify-center shadow-3xs shrink-0">
+                <NeuralSymbol state="completed" size={15} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-[#141413] tracking-wide uppercase font-mono">Strategy Mind</span>
+                  <span className="text-[8.5px] font-mono text-[#5db872] font-semibold bg-[#5db872]/10 px-2 py-0.5 rounded-full">✓ Aligned</span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed text-[#5E5B56] font-lora italic mt-1 bg-[#FBF9F6] border border-[#E9E2D9]/40 p-2 rounded-md select-text">
+                  "Premium, compliance-first lawyer targeting is economically viable. Recommending positioning on bar integrations for a 14% higher initial conversion."
+                </p>
+              </div>
+            </div>
+
+            {/* Finance Mind Finding */}
+            <div className="flex items-start gap-3.5 relative z-10">
+              <div className="w-7 h-7 rounded-full bg-white border border-[#E9E2D9] flex items-center justify-center shadow-3xs shrink-0">
+                <NeuralSymbol state="completed" size={15} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold text-[#141413] tracking-wide uppercase font-mono">Finance Mind</span>
+                  <span className="text-[8.5px] font-mono text-[#5db872] font-semibold bg-[#5db872]/10 px-2 py-0.5 rounded-full">✓ Validated</span>
+                </div>
+                <p className="text-[10.5px] leading-relaxed text-[#5E5B56] font-lora italic mt-1 bg-[#FBF9F6] border border-[#E9E2D9]/40 p-2 rounded-md select-text">
+                  "Target margin viability matches 78% margins. Projected LTV:CAC is healthy at 4.1x, easily absorbing compliance overhead costs."
+                </p>
+              </div>
+            </div>
+
+            {/* 3RDMIND Verdict Node Header */}
+            <div className="flex items-center gap-3.5 relative z-10 pt-1 border-t border-[#F4F0EB] mt-3">
+              <div className="w-7 h-7 rounded-full bg-[#7B61FF] flex items-center justify-center shadow-xs shrink-0 ring-4 ring-[#7B61FF]/10">
+                <NeuralSymbol state="generating_verdict" size={18} className="brightness-200 invert" />
+              </div>
+              <div>
+                <span className="text-[10.5px] font-black text-[#7B61FF] tracking-wider uppercase font-mono">◐ 3RDMIND CONSOLIDATED VERDICT</span>
+                <p className="text-[8.5px] text-[#8e8b82] font-mono mt-0.5">Synthesized from collective specialized findings</p>
+              </div>
+            </div>
+
+          </div>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[9px] font-mono text-[#5E5B56]">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#5db872]">✓</span>
-            <span>Research Complete</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#5db872]">✓</span>
-            <span>Validation Complete</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#5db872]">✓</span>
-            <span>Council Verdict Reached</span>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="w-full text-ink select-text">
         <ReactMarkdown

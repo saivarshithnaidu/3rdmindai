@@ -66,7 +66,12 @@ export default function CouncilDebateView({ agents, projectId }: CouncilDebateVi
 
   // 2. Filter child agents of the council manager (exclude ClaimExtractor from timeline cards if desired, but keep Verdict)
   const councilSeats = councilManager 
-    ? agents.filter(a => a.parent_agent_id === councilManager.id && a.name !== 'ClaimExtractor')
+    ? agents.filter(a => 
+        a.parent_agent_id === councilManager.id && 
+        a.name !== 'ClaimExtractor' &&
+        a.role !== 'Execution Task' &&
+        !a.name.startsWith('Task:')
+      )
     : [];
 
   const getSeatOrder = (agent: Agent) => {

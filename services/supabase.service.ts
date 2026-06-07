@@ -9,7 +9,9 @@ export const supabaseService = {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
       const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
       if (!url || !anonKey) {
-        console.warn('Supabase NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY is missing');
+        throw new Error(
+          'Supabase credentials missing. Please define NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment variables (e.g., Vercel project settings).'
+        );
       }
       clientInstance = createClient(url, anonKey, {
         auth: {
@@ -25,7 +27,9 @@ export const supabaseService = {
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
       if (!url || !serviceRoleKey) {
-        console.warn('Supabase NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY is missing');
+        throw new Error(
+          'Supabase service role credentials missing. Please define NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment variables (e.g., Vercel project settings).'
+        );
       }
       serviceClientInstance = createClient(url, serviceRoleKey, {
         auth: {
@@ -38,3 +42,4 @@ export const supabaseService = {
   },
 };
 export default supabaseService;
+

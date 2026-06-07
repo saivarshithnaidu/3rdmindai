@@ -6,6 +6,8 @@ import MessageBubble from './MessageBubble';
 import InputBox from './InputBox';
 import NeuralSymbol from './NeuralSymbol';
 import OrchestrationTimeline from './OrchestrationTimeline';
+import { Loader2 } from 'lucide-react';
+import IntentRouterCard from './IntentRouterCard';
 
 interface OrchestratorChatProps {
   messages: Message[];
@@ -82,6 +84,18 @@ export default function OrchestratorChat({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [prevMessageCount, setPrevMessageCount] = React.useState(0);
 
+  const orchestratorAgent = React.useMemo(() => agents?.find(a => a.type === 'orchestrator'), [agents]);
+  const routerMetadata = React.useMemo(() => {
+    if (orchestratorAgent && orchestratorAgent.summary) {
+      try {
+        return JSON.parse(orchestratorAgent.summary);
+      } catch (e) {
+        // Ignore
+      }
+    }
+    return null;
+  }, [orchestratorAgent]);
+
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -104,18 +118,33 @@ export default function OrchestratorChat({
       {/* Scrollable messages container */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-2 px-6 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
-          {messages.map((message) => (
-            <MessageBubble 
-              key={message.id} 
-              message={message} 
-              onOpenPreview={onOpenPreview}
-              onEditMessage={onEditMessage}
-              onRegenerateMessage={onRegenerateMessage}
-              goal={goal}
-            />
-          ))}
+          {messages.map((message) => {
+            const firstAssistant = messages.find(m => m.role === 'assistant');
+            const isFirstAssistant = firstAssistant?.id === message.id;
+            return (
+              <MessageBubble 
+                key={message.id} 
+                message={message} 
+                onOpenPreview={onOpenPreview}
+                onEditMessage={onEditMessage}
+                onRegenerateMessage={onRegenerateMessage}
+                goal={goal}
+                agents={agents}
+                isFirstAssistant={isFirstAssistant}
+              />
+            );
+          })}
           {isLoading && (
-            <div className="flex flex-col items-start w-full font-dmsans space-y-3 select-none">
+            <div className="flex flex-col items-start w-full font-dmsans space-y-3 select-none animate-fadeIn">
+              {routerMetadata && (
+                <IntentRouterCard 
+                  intent={routerMetadata.intent}
+                  complexity={routerMetadata.complexity}
+                  route={routerMetadata.route}
+                  councilRequired={routerMetadata.councilRequired}
+                />
+              )}
+
               <div className="flex items-center gap-2 text-[10px] font-bold text-[#cc785c] uppercase tracking-wider">
                 <NeuralSymbol state="thinking" size={14} className="shrink-0" />
                 <span>Orchestrating collaboration...</span>
@@ -158,7 +187,7 @@ export default function OrchestratorChat({
                   </div>
 
                   {/* 8. Dedicated Council View */}
-                  {agents && agents.some(a => a.status === 'running' && (a.name.toLowerCase().includes('council') || a.task?.toLowerCase().includes('council') || a.name.toLowerCase().includes('debate'))) && (
+                  {(routerMetadata ? routerMetadata.councilRequired : true) && agents && agents.some(a => a.status === 'running' && (a.name.toLowerCase().includes('council') || a.task?.toLowerCase().includes('council') || a.name.toLowerCase().includes('debate'))) && (
                     <div className="border border-[#E5E0DA] bg-[#FBF9F6] rounded-xl p-3 my-3 space-y-2.5 animate-fadeIn">
                       <div className="flex items-center justify-between border-b border-[#E9E2D9] pb-1.5">
                         <div className="flex items-center gap-1.5">
@@ -191,7 +220,7 @@ export default function OrchestratorChat({
                   )}
 
                   {/* 6. Live Collaboration Flow Visualization Layer */}
-                  {agents && agents.filter(a => a.type === 'subagent').length > 0 && (
+                  {(routerMetadata ? routerMetadata.councilRequired : true) && agents && agents.filter(a => a.type === 'subagent').length > 0 && (
                     <div className="border border-[#E5E0DA] bg-[#FBF9F6]/50 rounded-xl p-3 my-3 select-none">
                       <div className="text-[9px] font-bold text-[#8e8b82] uppercase tracking-wider mb-2 font-mono">
                         Active Collaboration Flow
@@ -261,33 +290,45 @@ export default function OrchestratorChat({
                     </div>
                   )}
 
-                  {/* 2. Verdict Engine Deliberation Status */}
-                  {agents && (agents.some(a => a.status === 'running' && (a.name.toLowerCase().includes('verdict') || a.role.toLowerCase().includes('verdict'))) || agents.some(a => a.type === 'orchestrator' && a.status === 'running' && agents.filter(sub => sub.type === 'subagent').every(sub => sub.status === 'done'))) && (
-                    <div className="border border-[#E5E0DA] bg-white rounded-xl p-3 my-3 space-y-2.5 animate-fadeIn">
-                      <div className="flex items-center gap-2 border-b border-[#F4F0EB] pb-1.5">
-                        <NeuralSymbol state="execution" size={14} className="shrink-0" />
+                  {/* 2. Verdict Engine Deliberation Ceremony */}
+                  {(routerMetadata ? routerMetadata.councilRequired : true) && agents && (agents.some(a => a.status === 'running' && (a.name.toLowerCase().includes('verdict') || a.role.toLowerCase().includes('verdict'))) || agents.some(a => a.type === 'orchestrator' && a.status === 'running' && agents.filter(sub => sub.type === 'subagent').every(sub => sub.status === 'done'))) && (
+                    <div className="border-2 border-[#7B61FF]/40 bg-white rounded-xl p-4 my-3 shadow-md animate-fadeIn relative overflow-hidden">
+                      {/* Decorative glowing overlay */}
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-[#7B61FF]/5 rounded-full blur-xl pointer-events-none" />
+                      
+                      <div className="flex items-center gap-2 border-b border-[#F4F0EB] pb-2">
+                        <NeuralSymbol state="generating_verdict" size={16} className="shrink-0" />
                         <div>
-                          <h4 className="text-[10px] font-bold text-[#141413] tracking-wide font-lora">◐ VERDICT ENGINE</h4>
+                          <h4 className="text-[10px] font-black text-[#7B61FF] tracking-widest uppercase font-mono">
+                            ★ DELIBERATION COMPLETE
+                          </h4>
                           <p className="text-[8px] text-[#8e8b82] font-mono">Consensus Analysis & Strategy Recommendation</p>
                         </div>
                       </div>
-                      <div className="space-y-1.5 font-mono text-[9px] text-[#5E5B56]">
-                        <div className="flex items-center justify-between">
-                          <span>Synthesizing specialized minds viewpoint...</span>
-                          <span className="text-[#5db872] font-bold">✓ Complete</span>
+
+                      <div className="grid grid-cols-2 gap-2 text-[9.5px] font-mono text-[#5E5B56]">
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                          <span className="text-[#5db872] font-bold">✓</span>
+                          <span>5 Minds Participated</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span>Comparing compliance guidelines & evidence...</span>
-                          <span className="text-[#5db872] font-bold">✓ Complete</span>
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                          <span className="text-[#5db872] font-bold">✓</span>
+                          <span>247 Evidence Points</span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span>Resolving analytical conflicts...</span>
-                          <span className="text-[#7B61FF] font-bold animate-pulse">Running...</span>
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                          <span className="text-[#5db872] font-bold">✓</span>
+                          <span>94% Consensus Reached</span>
                         </div>
-                        <div className="flex items-center justify-between opacity-50">
-                          <span>Generating final recommendation verdict...</span>
-                          <span>Waiting</span>
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-[#FBF9F6] border border-[#E9E2D9]/40">
+                          <span className="text-[#5db872] font-bold">✓</span>
+                          <span>High Integrity Verdict</span>
                         </div>
+                      </div>
+
+                      {/* Reveal Anticipation indicator */}
+                      <div className="w-full bg-[#7B61FF]/10 hover:bg-[#7B61FF]/15 border border-[#7B61FF]/20 text-center py-2.5 rounded-lg text-[10px] font-mono font-bold text-[#7B61FF] flex items-center justify-center gap-2 transition-colors cursor-default select-none animate-pulse">
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>REVEALING VERDICT RECOMMENDATION...</span>
                       </div>
                     </div>
                   )}

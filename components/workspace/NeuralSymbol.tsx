@@ -49,9 +49,15 @@ export default function NeuralSymbol({
   else if (isPurpleState) orbitAnimation = 'orbit-rotate-symbol 8s linear infinite';
 
   let innerAnimation = 'pulse-glow-symbol 2.5s ease-in-out infinite';
-  if (state === 'validating') innerAnimation = 'pulse-glow-symbol 1.2s ease-in-out infinite'; // fast validation double pulse
-  else if (state === 'generating_verdict') innerAnimation = 'pulse-glow-symbol 1.8s ease-in-out infinite';
-  else if (state === 'completed' || state === 'failed' || state === 'idle' || state === 'queued') innerAnimation = 'none';
+  if (isGoldState) {
+    innerAnimation = 'neural-pulse-gold 2.5s ease-in-out infinite';
+  } else if (isPurpleState) {
+    if (state === 'validating') innerAnimation = 'neural-pulse-purple 1.2s ease-in-out infinite';
+    else if (state === 'generating_verdict') innerAnimation = 'neural-pulse-purple 1.8s ease-in-out infinite';
+    else innerAnimation = 'neural-pulse-purple 2.2s ease-in-out infinite';
+  } else if (state === 'completed' || state === 'failed' || state === 'idle' || state === 'queued') {
+    innerAnimation = 'none';
+  }
 
   const isAnimatedTrack = isGoldState || isPurpleState;
 
@@ -71,6 +77,14 @@ export default function NeuralSymbol({
         @keyframes pulse-glow-symbol {
           0%, 100% { opacity: 0.4; transform: scale(0.96); }
           50% { opacity: 1.0; transform: scale(1.04); }
+        }
+        @keyframes neural-pulse-gold {
+          0%, 100% { transform: scale(0.95); opacity: 0.8; filter: drop-shadow(0 0 1px rgba(229, 154, 90, 0.4)); }
+          50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 6px rgba(229, 154, 90, 0.8)); }
+        }
+        @keyframes neural-pulse-purple {
+          0%, 100% { transform: scale(0.95); opacity: 0.8; filter: drop-shadow(0 0 1px rgba(123, 97, 255, 0.4)); }
+          50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 8px rgba(123, 97, 255, 0.8)); }
         }
         @keyframes dash-symbol {
           to { stroke-dashoffset: -40; }
