@@ -200,106 +200,112 @@ export default function AgentTree({ agents, selectedAgentId, onSelectAgent }: Ag
           No active minds.
         </div>
       ) : (
-        flattenedNodes.map((node) => {
+        flattenedNodes.map((node, index) => {
           const isSelected = selectedAgentId === node.id;
           const isOrchestrator = node.type === 'orchestrator';
           const runtime = getAgentRuntime(node);
+          const isLast = index === flattenedNodes.length - 1;
 
           const neuralState = getRichState(node.name, node.status, node.task, isOrchestrator);
 
           return (
             <div 
               key={node.id} 
-              className="relative transition-all duration-200"
-              style={{ paddingLeft: `${node.depth > 1 ? (node.depth - 1) * 24 : 0}px` }}
+              className="flex items-center gap-3 relative transition-all duration-200 py-1"
+              style={{ paddingLeft: `${node.depth > 1 ? (node.depth - 1) * 32 : 0}px` }}
             >
-              {/* Vertical connecting line overlay for workflow tree */}
+              {/* Pipeline connecting lines */}
               {node.depth > 1 && (
                 <>
                   <div 
-                    className="absolute border-l border-[#E9E2D9] h-full"
+                    className="absolute border-l-2 border-[#cc785c]/60"
                     style={{
-                      left: `${(node.depth - 2) * 24 + 12}px`,
-                      top: '-12px',
-                      height: '28px',
+                      left: '-14px',
+                      top: '-24px',
+                      height: isLast ? '42px' : 'calc(100% + 24px)',
                     }}
                   />
                   <div 
-                    className="absolute border-t border-[#E9E2D9] w-3"
+                    className="absolute border-t-2 border-[#cc785c]/60"
                     style={{
-                      left: `${(node.depth - 2) * 24 + 12}px`,
-                      top: '16px',
+                      left: '-14px',
+                      top: '18px',
+                      width: '14px',
                     }}
                   />
                 </>
               )}
 
+              {/* Standalone Node container representing the agent step */}
+              <div className="relative w-8 h-8 flex items-center justify-center shrink-0 z-10">
+                <div className={`rounded-full border flex items-center justify-center w-7 h-7 bg-white shadow-2xs transition-all duration-150 ${
+                  isSelected ? 'border-[#cc785c] scale-105 shadow-xs' : 'border-[#E9E2D9]'
+                }`}>
+                  <NeuralSymbol state={neuralState} size={15} />
+                </div>
+              </div>
+
+              {/* Metadata detail card to the right of the node */}
               <button
                 type="button"
                 onClick={() => onSelectAgent(node.id)}
-                className={`w-full flex items-start justify-between p-3 rounded-xl border transition-all text-left cursor-pointer ${
+                className={`flex-grow flex items-start justify-between p-3 rounded-xl border transition-all text-left cursor-pointer z-10 ${
                   isSelected
                     ? 'bg-white border-[#cc785c] shadow-xs'
-                    : 'bg-transparent border-[#E9E2D9] hover:bg-[#ECE5DD]/45'
+                    : 'bg-white/70 border-[#E9E2D9] hover:bg-[#ECE5DD]/45'
                 }`}
               >
-                <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                  <div className="shrink-0 mt-0.5">
-                    <NeuralSymbol state={neuralState} size={18} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-[#141413] truncate leading-tight font-lora">
+                    {node.name}
                   </div>
                   
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-bold text-[#141413] truncate leading-tight font-lora">
-                      {node.name}
-                    </div>
-                    
-                    <div className="text-[10px] text-[#5E5B56] truncate font-medium mt-0.5 flex items-center gap-1.5">
-                      <span className="truncate">{node.role}</span>
-                      {!isOrchestrator && node.model && (
-                        <>
-                          <span className="text-neutral-400 select-none text-[8px]">•</span>
-                          {getModelBadge(node.model)}
-                        </>
-                      )}
-                    </div>
+                  <div className="text-[10px] text-[#5E5B56] truncate font-medium mt-0.5 flex items-center gap-1.5">
+                    <span className="truncate">{node.role}</span>
+                    {!isOrchestrator && node.model && (
+                      <>
+                        <span className="text-neutral-400 select-none text-[8px]">•</span>
+                        {getModelBadge(node.model)}
+                      </>
+                    )}
+                  </div>
 
-                    {/* Progress tracking details */}
-                    {node.status === 'running' && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="w-24 bg-[#E9E2D9] h-1 rounded-full overflow-hidden">
-                          <div className="bg-[#7B61FF] h-full rounded-full animate-pulse" style={{ width: '78%' }} />
-                        </div>
-                        <span className="text-[9px] font-mono text-[#7B61FF]">78%</span>
+                  {/* Progress details */}
+                  {node.status === 'running' && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="w-24 bg-[#E9E2D9] h-1 rounded-full overflow-hidden">
+                        <div className="bg-[#7B61FF] h-full rounded-full animate-pulse" style={{ width: '78%' }} />
+                      </div>
+                      <span className="text-[9px] font-mono text-[#7B61FF]">78%</span>
+                    </div>
+                  )}
+
+                  {/* Stats horizontal metrics */}
+                  <div className="flex flex-wrap items-center gap-3 mt-2 select-none text-[9px] text-[#8e8b82] font-mono">
+                    {node.token_budget > 0 && (
+                      <div className="flex items-center gap-1">
+                        <Coins className="w-3 h-3" />
+                        <span>
+                          {formatTokens(node.tokens_used)} / {formatTokens(node.token_budget)} tkn
+                        </span>
                       </div>
                     )}
 
-                    {/* Stats horizontal metrics */}
-                    <div className="flex flex-wrap items-center gap-3 mt-2 select-none text-[9px] text-[#8e8b82] font-mono">
-                      {node.token_budget > 0 && (
-                        <div className="flex items-center gap-1">
-                          <Coins className="w-3 h-3" />
-                          <span>
-                            {formatTokens(node.tokens_used)} / {formatTokens(node.token_budget)} tkn
-                          </span>
-                        </div>
-                      )}
+                    {toolCounts[node.id] > 0 && (
+                      <div className="flex items-center gap-1 text-[#cc785c]">
+                        <Zap className="w-3 h-3" />
+                        <span>
+                          {toolCounts[node.id]} tool{toolCounts[node.id] > 1 ? 's' : ''} call{toolCounts[node.id] > 1 ? 's' : ''}
+                        </span>
+                      </div>
+                    )}
 
-                      {toolCounts[node.id] > 0 && (
-                        <div className="flex items-center gap-1 text-[#cc785c]">
-                          <Zap className="w-3 h-3" />
-                          <span>
-                            {toolCounts[node.id]} tool{toolCounts[node.id] > 1 ? 's' : ''} call{toolCounts[node.id] > 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      )}
-
-                      {runtime && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          <span>{runtime}</span>
-                        </div>
-                      )}
-                    </div>
+                    {runtime && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{runtime}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

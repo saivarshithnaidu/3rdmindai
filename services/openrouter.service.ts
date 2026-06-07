@@ -23,11 +23,15 @@ export const openrouterService = {
     }
 
     // Token budget enforcement
+    let remainingBudget = 3000;
     if (agentId) {
       try {
         const agent = await agentService.getAgent(agentId);
-        if (agent && agent.tokens_used >= agent.token_budget) {
-          return "[Token budget exceeded. Response truncated.]";
+        if (agent) {
+          if (agent.tokens_used >= agent.token_budget) {
+            return "[Token budget exceeded. Response truncated.]";
+          }
+          remainingBudget = Math.max(1, agent.token_budget - agent.tokens_used);
         }
       } catch (err) {
         console.warn(`Budget check failed for agent ${agentId}:`, err);
@@ -40,6 +44,7 @@ export const openrouterService = {
         { role: 'system', content: system },
         ...messages.map((m) => ({ role: m.role, content: m.content })),
       ],
+      max_tokens: Math.min(3000, remainingBudget),
     };
 
     let lastError: Error | null = null;
@@ -140,18 +145,27 @@ Always call tools when they would improve your output. Do not simulate tool resu
       async start(controller) {
         try {
           // Token budget enforcement
+          let remainingBudget = 3000;
           if (agentId) {
             try {
               const agent = await agentService.getAgent(agentId);
-              if (agent && agent.tokens_used >= agent.token_budget) {
-                controller.enqueue(encoder.encode("[Token budget exceeded. Response truncated.]"));
-                controller.close();
-                return;
+              if (agent) {
+                if (agent.tokens_used >= agent.token_budget) {
+                  controller.enqueue(encoder.encode("[Token budget exceeded. Response truncated.]"));
+                  controller.close();
+                  return;
+                }
+                remainingBudget = Math.max(1, agent.token_budget - agent.tokens_used);
               }
             } catch (err) {
               console.warn(`Budget check failed for agent ${agentId}:`, err);
             }
           }
+
+          const requestPayload = {
+            ...payload,
+            max_tokens: Math.min(3000, remainingBudget),
+          };
 
           let response: Response | null = null;
           let lastError: Error | null = null;
@@ -167,7 +181,7 @@ Always call tools when they would improve your output. Do not simulate tool resu
                   'X-Title': '3RDMIND',
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(requestPayload),
               });
 
               if (!response.ok) {
