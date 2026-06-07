@@ -872,6 +872,7 @@ export default function WorkspaceLayout({
             <OrchestratorChat
               messages={messages}
               isLoading={isOrchestratorLoading || activeAgent.status === 'running'}
+              agents={agents}
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
               onSubmit={handleSendMessage}

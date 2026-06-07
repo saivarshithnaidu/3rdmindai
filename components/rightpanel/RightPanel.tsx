@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Agent, Project, BrowserSession } from '../../types';
 import AgentTree from './AgentTree';
+import NeuralSymbol from '../workspace/NeuralSymbol';
 import LiveDataCanvas from '../canvas/LiveDataCanvas';
 import LiveBrowser from '../browser/LiveBrowser';
 import ArtifactRenderer from '../artifacts/ArtifactRenderer';
@@ -365,7 +366,7 @@ export default function RightPanel({
       {!(isTabBarCollapsed && (activeTab === 'canvas' || activeTab === 'artifact')) && (
         <div className="flex items-center justify-center gap-1 px-3 py-2 border-b border-[#E5E0DA] bg-[#F4F0EB] shrink-0 animate-slideDown">
           {[
-            { key: 'agents' as const, icon: GitBranch, tooltip: 'Agent Tree', dot: null },
+            { key: 'agents' as const, icon: GitBranch, tooltip: 'Mind Network', dot: null },
             { key: 'tools' as const, icon: Sliders, tooltip: 'Connectors & Tools', dot: (effectiveCouncilMode || effectiveToolsState.webSearch || effectiveToolsState.exaSearch || effectiveToolsState.kaggle || effectiveToolsState.database || effectiveToolsState.rag) ? 'bg-emerald-500' : null },
             { key: 'files' as const, icon: Paperclip, tooltip: 'Files & Context', dot: null },
             { key: 'preview' as const, icon: Eye, tooltip: 'Live Preview', dot: null },
@@ -746,13 +747,28 @@ export default function RightPanel({
         )}
 
         {activeTab === 'agents' && (
-          <div id="workspace-agents-section" className="space-y-3">
-            <div className="flex items-center justify-between text-[11px] font-bold text-[#85827D] uppercase tracking-wider mb-2 font-dmsans">
-              <span>Spawned Workflow</span>
-              <span className="text-[10px] bg-[#E9E3DB] text-[#191919] px-2 py-0.5 rounded-full font-bold">
-                {subAgentsCount + 1} Agents
-              </span>
+          <div id="workspace-agents-section" className="space-y-4 animate-fadeIn flex flex-col">
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-2 select-text">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <NeuralSymbol 
+                    state={agents.some(a => a.status === 'running') ? 'execution' : 'thinking'} 
+                    size={16} 
+                    className="shrink-0" 
+                  />
+                  <span className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">
+                    MIND NETWORK
+                  </span>
+                </div>
+                <span className="text-[9px] bg-[#cc785c]/10 text-[#cc785c] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider select-none">
+                  Mission Control
+                </span>
+              </div>
+              <p className="text-[11px] text-[#5E5B56] leading-relaxed">
+                Observe specialized minds collaborating on your goal. Watch tool execution and token metrics in real-time.
+              </p>
             </div>
+            
             <AgentTree
               agents={agents}
               selectedAgentId={selectedAgentId}

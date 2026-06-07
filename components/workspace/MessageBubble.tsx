@@ -6,6 +6,7 @@ import { Message } from '../../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, ExternalLink, Download, Printer, ThumbsUp, ThumbsDown, Pencil, RotateCcw } from 'lucide-react';
+import NeuralSymbol from './NeuralSymbol';
 
 interface MessageBubbleProps {
   message: Message;
@@ -730,6 +731,10 @@ export default function MessageBubble({ message, onOpenPreview, onEditMessage, o
       transition={{ duration: 0.2, ease: 'easeOut' }}
       className="flex flex-col items-start w-full font-dmsans group"
     >
+      <div className="flex items-center gap-2 mb-2 text-[10px] font-bold text-[#cc785c] uppercase tracking-wider select-none">
+        <NeuralSymbol state="completed" size={14} className="shrink-0" />
+        <span>3RDMIND</span>
+      </div>
       <div className="w-full text-ink select-text">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
