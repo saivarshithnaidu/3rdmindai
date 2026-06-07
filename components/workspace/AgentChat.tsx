@@ -14,9 +14,24 @@ interface AgentChatProps {
 
 export default function AgentChat({ agent, messages, onOpenPreview }: AgentChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [prevMessageCount, setPrevMessageCount] = React.useState(0);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const lastMessage = messages[messages.length - 1];
+    const isUserMessage = lastMessage?.role === 'user';
+    
+    const threshold = 150;
+    const isAtBottom = 
+      container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+
+    if (prevMessageCount === 0 || isUserMessage || isAtBottom) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+    setPrevMessageCount(messages.length);
   }, [messages]);
 
   return (
@@ -35,7 +50,7 @@ export default function AgentChat({ agent, messages, onOpenPreview }: AgentChatP
       </div>
 
       {/* Scrollable messages container */}
-      <div className="flex-1 overflow-y-auto pt-4 pb-2 px-6 space-y-6">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pt-4 pb-2 px-6 space-y-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map((message) => (
             <MessageBubble 
