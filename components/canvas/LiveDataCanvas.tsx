@@ -1,10 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
+import { ModuleRegistry } from 'ag-grid-community';
+import { AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { supabaseService } from '../../services/supabase.service';
 import { Canvas, CanvasRow, ColumnSchema } from '../../types';
 import { FileDown, Loader2, Database, AlertCircle, CheckCircle2 } from 'lucide-react';
+
+// Register AG Grid modules globally for version 35+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 interface LiveDataCanvasProps {
   canvasId: string;

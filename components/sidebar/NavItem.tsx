@@ -8,9 +8,10 @@ interface NavItemProps {
   icon: React.ReactNode;
   active?: boolean;
   onClick?: () => void;
+  badge?: React.ReactNode;
 }
 
-export default function NavItem({ label, icon, active = false, onClick }: NavItemProps) {
+export default function NavItem({ label, icon, active = false, onClick, badge }: NavItemProps) {
   return (
     <motion.button
       type="button"
@@ -24,7 +25,8 @@ export default function NavItem({ label, icon, active = false, onClick }: NavIte
       }`}
     >
       <span className={`${active ? 'text-[#D97757]' : 'text-[#85827D]'}`}>{icon}</span>
-      <span>{label}</span>
+      <span className="flex-1">{label}</span>
+      {badge}
     </motion.button>
   );
 }

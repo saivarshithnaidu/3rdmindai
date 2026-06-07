@@ -368,7 +368,7 @@ Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
                           managerAgent.task?.toLowerCase().includes('debate');
 
         const councilModels = [
-          'google/gemini-pro-1.5',
+          'google/gemini-2.5-pro',
           'openai/gpt-4o',
           'deepseek/deepseek-chat',
           'meta-llama/llama-3-70b-instruct'
@@ -963,11 +963,17 @@ Provide your response directly. Keep it structured and high quality.`;
       // 5. Reactive tool calls loop check
       const toolCalls = mcpService.parseToolCalls(fullText);
       if (toolCalls.length > 0) {
+        // Retrieve the assistant message we just created to get its ID
+        const latestMsgs = await messageService.getAgentMessages(executorAgent.id);
+        const assistantMsg = latestMsgs.reverse().find(m => m.role === 'assistant');
+        const messageId = assistantMsg?.id || null;
+
         // Execute tool calls and save logs to DB
         const toolResultContext = await mcpService.executeToolCalls(
           toolCalls,
           executorAgent.id,
           executorAgent.project_id,
+          messageId,
           null
         );
 

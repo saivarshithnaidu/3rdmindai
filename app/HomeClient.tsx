@@ -22,7 +22,7 @@ export default function HomeClient({ initialProjects }: HomeClientProps) {
     if (label === 'Customize') {
       alert("Customization option coming soon! Here you can customize system prompts and default agent behavior.");
       setActiveNavItem('Chats');
-    } else if (label !== 'Chats') {
+    } else if (label !== 'Chats' && label !== 'Connectors' && label !== 'Price Watch') {
       alert(`Select a chat session from the Recents list to view its ${label}.`);
       setActiveNavItem('Chats');
     }

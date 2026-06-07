@@ -1,11 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { DEFAULT_ORCHESTRATOR_MODEL } from '../../lib/constants';
-import { ArrowUp, Plus, Loader2, FileText, X } from 'lucide-react';
+import { DEFAULT_ORCHESTRATOR_MODEL, AVAILABLE_MODELS } from '../../lib/constants';
+import { ArrowUp, Plus, Loader2, FileText, X, Brain, Database } from 'lucide-react';
 import { motion } from 'framer-motion';
 import ModelSelector from '../workspace/ModelSelector';
-import PopoverMenu from '../workspace/PopoverMenu';
 
 interface GoalInputProps {
   value: string;
@@ -37,6 +36,39 @@ export default function GoalInput({ value, onChange, onSubmit, isLoading }: Goal
 
   const [uploadedResume, setUploadedResume] = useState<string | null>(null);
   const [uploadedFilename, setUploadedFilename] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const parseRes = await fetch('/api/parse', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!parseRes.ok) throw new Error('Failed to parse file.');
+      const parseData = await parseRes.json();
+      
+      setUploadedResume(parseData.text);
+      setUploadedFilename(file.name);
+      
+      alert(`File parsed successfully: ${file.name}`);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : 'File upload failed');
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,9 +147,181 @@ export default function GoalInput({ value, onChange, onSubmit, isLoading }: Goal
           </div>
         )}
 
+        {showMenu && (
+          <div className="border-t border-[#F4F0EB] pt-4 mt-2 grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
+            {/* Left Column: Context & Connectors */}
+            <div className="space-y-4">
+              {/* Context File */}
+              <div className="bg-[#FBF9F6] border border-[#E5E0DA] rounded-xl p-3 space-y-2">
+                <span className="text-[10px] font-bold text-[#85827D] uppercase tracking-wider block">1. File Context</span>
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange}
+                  accept=".pdf,.txt,.md" 
+                  className="hidden" 
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full flex items-center justify-center gap-2 py-2 border border-dashed border-[#C2BCB2] hover:bg-[#F4F0EB] text-xs font-semibold text-[#5E5B56] rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isUploading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#85827D]" />
+                      <span>Parsing context file...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Attach PDF, TXT, or MD</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Connectors & Tools */}
+              <div className="bg-[#FBF9F6] border border-[#E5E0DA] rounded-xl p-3 space-y-2">
+                <span className="text-[10px] font-bold text-[#85827D] uppercase tracking-wider block">2. Connectors & Tools</span>
+                <div className="space-y-1">
+                  {(Object.keys(toolsState) as Array<keyof typeof toolsState>).map((key) => {
+                    const labels: Record<string, string> = {
+                      webSearch: 'Tavily Web Search',
+                      exaSearch: 'Exa Neural Search',
+                      kaggle: 'Kaggle Datasets',
+                      database: 'Supabase PostgreSQL',
+                      rag: 'Qdrant Vector RAG'
+                    };
+                    return (
+                      <div key={key} className="flex items-center justify-between py-1 text-xs font-semibold text-[#5E5B56]">
+                        <span>{labels[key]}</span>
+                        <button
+                          type="button"
+                          onClick={() => setToolsState(prev => ({ ...prev, [key]: !prev[key] }))}
+                          className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-250 cursor-pointer ${
+                            toolsState[key] ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                          }`}
+                        >
+                          <div className={`w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
+                            toolsState[key] ? 'translate-x-3' : 'translate-x-0'
+                          }`} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: AI Council */}
+            <div className="space-y-4">
+              <div className="bg-[#FBF9F6] border border-[#E5E0DA] rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between pb-1 border-b border-[#F4F0EB]">
+                  <div className="flex items-center gap-1.5">
+                    <Brain className={`w-4 h-4 ${councilMode ? 'text-purple-600' : 'text-[#85827D]'}`} />
+                    <span className="text-[10px] font-bold text-[#85827D] uppercase tracking-wider">3. AI Council Mode</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setCouncilMode(!councilMode)}
+                    className={`w-7 h-4 rounded-full p-0.5 transition-colors duration-250 cursor-pointer ${
+                      councilMode ? 'bg-[#5B39E0]' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-3 h-3 rounded-full bg-white transition-transform duration-200 ${
+                      councilMode ? 'translate-x-3' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                {councilMode && (
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-bold text-[#85827D] uppercase">Seats ({councilConfig.seats.length})</span>
+                      <label className="flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={councilConfig.enableVerdict}
+                          onChange={(e) => setCouncilConfig(prev => ({ ...prev, enableVerdict: e.target.checked }))}
+                          className="rounded text-purple-600 focus:ring-purple-500 w-3 h-3"
+                        />
+                        <span className="text-[9px] text-[#5E5B56] font-semibold">Arbiter Verdict</span>
+                      </label>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {councilConfig.seats.map((seat, index) => (
+                        <div key={index} className="flex items-center gap-1.5 bg-white p-1.5 border border-[#EBE5DC] rounded-lg shadow-3xs">
+                          <input
+                            type="text"
+                            value={seat.name}
+                            onChange={(e) => {
+                              const newSeats = [...councilConfig.seats];
+                              newSeats[index] = { ...newSeats[index], name: e.target.value, role: `${e.target.value} Seat` };
+                              setCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                            }}
+                            className="w-16 text-[10px] bg-transparent border-0 border-b border-[#E5E0DA] focus:border-purple-500 px-0.5 py-0.5 font-bold text-[#191919] focus:outline-none"
+                            placeholder="Seat name"
+                          />
+                          <select
+                            value={seat.model}
+                            onChange={(e) => {
+                              const newSeats = [...councilConfig.seats];
+                              newSeats[index] = { ...newSeats[index], model: e.target.value };
+                              setCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                            }}
+                            className="flex-grow text-[9px] bg-transparent border border-[#E5E0DA] rounded px-1 py-0.5 font-medium text-[#5E5B56] focus:outline-none max-w-[110px] truncate"
+                          >
+                            {AVAILABLE_MODELS.map((model) => (
+                              <option key={model.id} value={model.id}>
+                                {model.name}
+                              </option>
+                            ))}
+                          </select>
+                          {councilConfig.seats.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSeats = councilConfig.seats.filter((_, i) => i !== index);
+                                setCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                              }}
+                              className="p-0.5 text-red-500 hover:bg-red-50 rounded text-xs transition-colors"
+                              title="Remove seat"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {councilConfig.seats.length < 6 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newSeat = {
+                            name: `Seat ${councilConfig.seats.length + 1}`,
+                            role: `Seat ${councilConfig.seats.length + 1} Seat`,
+                            model: AVAILABLE_MODELS[0].id
+                          };
+                          setCouncilConfig(prev => ({ ...prev, seats: [...prev.seats, newSeat] }));
+                        }}
+                        className="w-full text-center py-1 border border-dashed border-[#C2BCB2] hover:bg-[#F4F0EB] text-[9px] font-bold text-[#5E5B56] rounded transition-colors cursor-pointer"
+                      >
+                        + Add Seat
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex items-center justify-between mt-1 pt-2 border-t border-[#F4F0EB] relative">
-          {/* Left Actions - Add attachment '+' icon with Popover */}
-          <div className="relative">
+          {/* Left Actions - Add attachment '+' icon to open settings panel inline */}
+          <div>
             <button
               type="button"
               onClick={() => setShowMenu(!showMenu)}
@@ -129,21 +333,6 @@ export default function GoalInput({ value, onChange, onSubmit, isLoading }: Goal
             >
               <Plus className="w-4 h-4" />
             </button>
-
-            <PopoverMenu
-              isOpen={showMenu}
-              onClose={() => setShowMenu(false)}
-              councilMode={councilMode}
-              setCouncilMode={setCouncilMode}
-              toolsState={toolsState}
-              setToolsState={setToolsState}
-              onFileUploaded={(text, filename) => {
-                setUploadedResume(text);
-                setUploadedFilename(filename);
-              }}
-              councilConfig={councilConfig}
-              setCouncilConfig={setCouncilConfig}
-            />
           </div>
 
           {/* Right Actions - Model Selector + Submit Button */}

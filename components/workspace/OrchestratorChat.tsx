@@ -14,10 +14,35 @@ interface OrchestratorChatProps {
   projectId?: string;
   onFileUploaded?: (text: string, filename: string) => void;
   onOpenPreview?: (code: string, title: string) => void;
+  onEditMessage?: (messageId: string, newContent: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
   inputValue?: string;
   onInputValueChange?: (val: string) => void;
   activeCanvasId?: string | null;
   activeArtifactId?: string | null;
+  onOpenBrowserPicker?: () => void;
+
+  // Props for tools & connectors panel integration
+  councilMode: boolean;
+  setCouncilMode: (val: boolean) => void;
+  toolsState: {
+    webSearch: boolean;
+    exaSearch: boolean;
+    kaggle: boolean;
+    database: boolean;
+    rag: boolean;
+  };
+  setToolsState: React.Dispatch<React.SetStateAction<{
+    webSearch: boolean;
+    exaSearch: boolean;
+    kaggle: boolean;
+    database: boolean;
+    rag: boolean;
+  }>>;
+  councilConfig: any;
+  setCouncilConfig: any;
+  onToggleToolsPanel: () => void;
+  isToolsPanelActive: boolean;
 }
 
 export default function OrchestratorChat({
@@ -29,10 +54,21 @@ export default function OrchestratorChat({
   projectId,
   onFileUploaded,
   onOpenPreview,
+  onEditMessage,
+  onRegenerateMessage,
   inputValue,
   onInputValueChange,
   activeCanvasId,
-  activeArtifactId
+  activeArtifactId,
+  onOpenBrowserPicker,
+  councilMode,
+  setCouncilMode,
+  toolsState,
+  setToolsState,
+  councilConfig,
+  setCouncilConfig,
+  onToggleToolsPanel,
+  isToolsPanelActive
 }: OrchestratorChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -50,6 +86,8 @@ export default function OrchestratorChat({
               key={message.id} 
               message={message} 
               onOpenPreview={onOpenPreview}
+              onEditMessage={onEditMessage}
+              onRegenerateMessage={onRegenerateMessage}
             />
           ))}
           {isLoading && (
@@ -82,6 +120,15 @@ export default function OrchestratorChat({
         onInputValueChange={onInputValueChange}
         activeCanvasId={activeCanvasId}
         activeArtifactId={activeArtifactId}
+        onOpenBrowserPicker={onOpenBrowserPicker}
+        councilMode={councilMode}
+        setCouncilMode={setCouncilMode}
+        toolsState={toolsState}
+        setToolsState={setToolsState}
+        councilConfig={councilConfig}
+        setCouncilConfig={setCouncilConfig}
+        onToggleToolsPanel={onToggleToolsPanel}
+        isToolsPanelActive={isToolsPanelActive}
       />
     </div>
   );

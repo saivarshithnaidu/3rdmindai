@@ -123,6 +123,51 @@ export const messageService = {
 
     return fullContent;
   },
+
+  async deleteMessage(messageId: string): Promise<void> {
+    const supabase = supabaseService.getServiceClient();
+    const { error } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', messageId);
+
+    if (error) {
+      throw new Error(`Failed to delete message: ${error.message}`);
+    }
+  },
+
+  async truncateMessagesFrom(messageId: string, inclusive: boolean = true): Promise<void> {
+    const supabase = supabaseService.getServiceClient();
+    // 1. Get the message's created_at and agent_id
+    const { data: message, error: getError } = await supabase
+      .from('messages')
+      .select('created_at, agent_id')
+      .eq('id', messageId)
+      .single();
+
+    if (getError) {
+      throw new Error(`Failed to fetch message for truncation: ${getError.message}`);
+    }
+    if (!message) return;
+
+    // 2. Delete all messages with the same agent_id and created_at >= or > target message's created_at
+    let query = supabase
+      .from('messages')
+      .delete()
+      .eq('agent_id', message.agent_id);
+
+    if (inclusive) {
+      query = query.gte('created_at', message.created_at);
+    } else {
+      query = query.gt('created_at', message.created_at);
+    }
+
+    const { error: deleteError } = await query;
+
+    if (deleteError) {
+      throw new Error(`Failed to truncate messages: ${deleteError.message}`);
+    }
+  },
 };
 
 export default messageService;

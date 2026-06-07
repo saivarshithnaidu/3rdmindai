@@ -3,28 +3,38 @@ import supabaseService from '../../../../services/supabase.service';
 
 export async function POST(req: NextRequest) {
   try {
-    const { id } = await req.json();
+    const body = await req.json();
+    const { slug, userId } = body;
 
-    if (!id) {
-      return NextResponse.json({ error: 'Missing connector id' }, { status: 400 });
+    if (!slug) {
+      return NextResponse.json({ error: 'Missing slug' }, { status: 400 });
     }
 
+    const activeUserId = userId || '00000000-0000-0000-0000-000000000000';
     const supabase = supabaseService.getServiceClient();
-    
-    // We delete the record from connectors to erase credentials and set active to false
+
+    // Deactivate connection and clear secrets for security
     const { error } = await supabase
       .from('connectors')
-      .delete()
-      .eq('id', id);
+      .update({
+        is_active: false,
+        api_key: null,
+        access_token: null,
+        refresh_token: null,
+        token_expiry: null,
+        scopes: null
+      })
+      .eq('user_id', activeUserId)
+      .eq('slug', slug);
 
-    if (error) throw error;
+    if (error) {
+      console.error('Failed to deactivate connector:', error.message);
+      return NextResponse.json({ error: `Database error: ${error.message}` }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error disconnecting connector:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+  } catch (err: any) {
+    console.error('Disconnect connector failed:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

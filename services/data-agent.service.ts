@@ -331,7 +331,13 @@ Do NOT output markdown. Output raw JSON only.`;
 
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, canvas.name || 'Research');
+    
+    // Excel sheet names cannot exceed 31 characters and cannot contain special characters like \ / ? * : [ ]
+    const sanitizedSheetName = (canvas.name || 'Research')
+      .substring(0, 31)
+      .replace(/[\\\?\*\/\[\]\:]/g, '');
+      
+    XLSX.utils.book_append_sheet(wb, ws, sanitizedSheetName || 'Research');
 
     // Generate buffer
     const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });

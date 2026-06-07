@@ -104,6 +104,18 @@ export const projectService = {
     }
     return updated;
   },
+
+  async deleteProject(id: string): Promise<void> {
+    const supabase = supabaseService.getServiceClient();
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      throw new Error(`Failed to delete project: ${error.message}`);
+    }
+  },
 };
 
 export default projectService;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project } from '../../types';
 import NavItem from './NavItem';
@@ -40,6 +40,19 @@ export default function Sidebar({
 }: SidebarProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [connectedCount, setConnectedCount] = useState(0);
+
+  useEffect(() => {
+    fetch('/api/connectors/list?userId=00000000-0000-0000-0000-000000000000')
+      .then(res => res.json())
+      .then(data => {
+        if (data && Array.isArray(data.connectors)) {
+          const count = data.connectors.filter((c: any) => c.isConnected).length;
+          setConnectedCount(count);
+        }
+      })
+      .catch(err => console.warn('Failed to fetch connector count in sidebar:', err));
+  }, []);
 
   const filteredProjects = projects.filter(p => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -178,10 +191,47 @@ export default function Sidebar({
         />
         <NavItem 
           label="Connectors" 
-          icon={<Plug className="w-4 h-4" />} 
+          icon={<i className="ti ti-plug-connected text-sm" />} 
           active={activeNavItem === 'Connectors'}
           onClick={() => {
+            router.push('/connectors');
             if (onNavClick) onNavClick('Connectors');
+          }}
+          badge={connectedCount > 0 ? (
+            <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+              {connectedCount}
+            </span>
+          ) : null}
+        />
+        <NavItem 
+          label="Team" 
+          icon={<i className="ti ti-users text-sm" />} 
+          active={activeNavItem === 'Team'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/startup/${activeProjectId}`);
+            } else {
+              router.push('/workspace');
+            }
+            if (onNavClick) onNavClick('Team');
+          }}
+          badge={(
+            <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+              6
+            </span>
+          )}
+        />
+        <NavItem 
+          label="Price Watch" 
+          icon={<i className="ti ti-tag text-sm" />} 
+          active={activeNavItem === 'Price Watch'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/price-watch?projectId=${activeProjectId}`);
+            } else {
+              router.push('/price-watch');
+            }
+            if (onNavClick) onNavClick('Price Watch');
           }}
         />
       </div>

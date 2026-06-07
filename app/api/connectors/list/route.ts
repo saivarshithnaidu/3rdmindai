@@ -1,38 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mcpService from '../../../../services/mcp.service';
-import { AVAILABLE_CONNECTORS } from '../../../../lib/connectors';
+import { ALL_CONNECTORS } from '../../../../lib/connectors.registry';
+
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get('userId') || null;
+    const userId = searchParams.get('userId') || '00000000-0000-0000-0000-000000000000';
 
-    // Fetch user connectors from database
-    const dbConnectors = await mcpService.getConnectors(userId);
+    // Get active user connectors from Supabase
+    const activeConnectors = await mcpService.getConnectors(userId);
 
-    // Merge registered available connectors with their DB configurations
-    const merged = AVAILABLE_CONNECTORS.map((reg) => {
-      const dbMatch = dbConnectors.find((dbc) => dbc.name.toLowerCase() === reg.id.toLowerCase());
+    // Merge registry with database states
+    const connectorsList = ALL_CONNECTORS.map(connector => {
+      const active = activeConnectors.find(c => c.slug === connector.slug);
+      const isConnected = !!active?.isActive;
       
       return {
-        id: dbMatch ? dbMatch.id : reg.id, // DB UUID if connected, else string slug
-        name: reg.name,
-        category: reg.category,
-        description: reg.description,
-        authType: reg.authType,
-        serverUrl: dbMatch ? dbMatch.serverUrl : reg.serverUrl,
-        isActive: dbMatch ? dbMatch.isActive : false,
-        docsUrl: reg.docsUrl,
-        icon: reg.icon,
+        ...connector,
+        isConnected,
+        toolsAvailable: isConnected ? (active?.toolsAvailable || connector.tools.length) : 0,
+        // Exclude secret tokens from being leaked to client
+        isActive: isConnected
       };
     });
 
-    return NextResponse.json(merged);
-  } catch (error) {
-    console.error('Error listing connectors:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ connectors: connectorsList });
+  } catch (err: any) {
+    console.error('Failed to list connectors:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

@@ -1,20 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mcpService from '../../../../services/mcp.service';
 
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const projectId = searchParams.get('projectId') || null;
-    const userId = searchParams.get('userId') || null;
+    const userId = searchParams.get('userId') || '00000000-0000-0000-0000-000000000000';
 
-    const tools = await mcpService.getAvailableTools(userId, projectId);
-
-    return NextResponse.json(tools);
-  } catch (error) {
-    console.error('Error fetching available tools:', error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
+    const tools = await mcpService.getAvailableTools(userId, null);
+    return NextResponse.json({ tools });
+  } catch (err: any) {
+    console.error('Failed to get available tools:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

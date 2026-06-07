@@ -16,7 +16,7 @@ export default function RootLayout({
       lang="en"
       className="h-full antialiased"
     >
-      <body className="h-full overflow-hidden flex flex-col bg-[#FBF9F6] text-[#191919] font-dmsans">
+      <body className="h-full overflow-hidden flex flex-col bg-canvas text-ink font-dmsans">
         {children}
       </body>
     </html>

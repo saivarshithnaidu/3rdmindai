@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
-import { Agent, Project } from '../../types';
+import { Agent, Project, BrowserSession } from '../../types';
 import AgentTree from './AgentTree';
 import LiveDataCanvas from '../canvas/LiveDataCanvas';
+import LiveBrowser from '../browser/LiveBrowser';
 import ArtifactRenderer from '../artifacts/ArtifactRenderer';
 import ArtifactToolbar from '../artifacts/ArtifactToolbar';
 import ArtifactPicker from '../artifacts/ArtifactPicker';
@@ -25,8 +26,11 @@ import {
   Eye,
   Brain,
   Table2,
-  Scale
+  Scale,
+  Globe,
+  Sliders
 } from 'lucide-react';
+import { AVAILABLE_MODELS } from '../../lib/constants';
 
 interface RightPanelProps {
   project: Project;
@@ -35,8 +39,8 @@ interface RightPanelProps {
   onSelectAgent: (agentId: string | null) => void;
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
-  activeTab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council';
-  onTabChange: (tab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council') => void;
+  activeTab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools';
+  onTabChange: (tab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools') => void;
   onProjectUpdate?: (project: Project) => void;
   previewContent?: string;
   previewTitle?: string;
@@ -49,6 +53,33 @@ interface RightPanelProps {
   onSelectPreset?: (preset: any) => void;
   panelWidth?: number;
   onPanelWidthChange?: (width: number) => void;
+  browserSession?: BrowserSession | null;
+  
+  // Optional props for tools & connectors panel integration
+  councilMode?: boolean;
+  setCouncilMode?: (val: boolean) => void;
+  toolsState?: {
+    webSearch: boolean;
+    exaSearch: boolean;
+    kaggle: boolean;
+    database: boolean;
+    rag: boolean;
+  };
+  setToolsState?: React.Dispatch<React.SetStateAction<{
+    webSearch: boolean;
+    exaSearch: boolean;
+    kaggle: boolean;
+    database: boolean;
+    rag: boolean;
+  }>>;
+  councilConfig?: {
+    seats: Array<{ name: string; role: string; model: string }>;
+    enableVerdict: boolean;
+  };
+  setCouncilConfig?: React.Dispatch<React.SetStateAction<{
+    seats: Array<{ name: string; role: string; model: string }>;
+    enableVerdict: boolean;
+  }>>;
 }
 
 export default function RightPanel({
@@ -72,6 +103,13 @@ export default function RightPanel({
   onSelectPreset,
   panelWidth = 35,
   onPanelWidthChange,
+  browserSession = null,
+  councilMode,
+  setCouncilMode,
+  toolsState,
+  setToolsState,
+  councilConfig,
+  setCouncilConfig
 }: RightPanelProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [isPasting, setIsPasting] = useState(false);
@@ -79,6 +117,34 @@ export default function RightPanel({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [dbNeedsMigration, setDbNeedsMigration] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  // Local fallbacks if props not passed (like in subagent workspace)
+  const [localCouncilMode, setLocalCouncilMode] = useState(false);
+  const [localToolsState, setLocalToolsState] = useState({
+    webSearch: true,
+    exaSearch: false,
+    kaggle: false,
+    database: false,
+    rag: false
+  });
+  const [localCouncilConfig, setLocalCouncilConfig] = useState({
+    seats: [
+      { name: 'Creative', role: 'Creative Seat', model: 'google/gemini-pro-1.5' },
+      { name: 'Critic', role: 'Critic Seat', model: 'openai/gpt-4o' },
+      { name: 'Auditor', role: 'Auditor Seat', model: 'deepseek/deepseek-chat' },
+      { name: 'General', role: 'General Seat', model: 'meta-llama/llama-3-70b-instruct' }
+    ],
+    enableVerdict: true
+  });
+
+  const effectiveCouncilMode = councilMode !== undefined ? councilMode : localCouncilMode;
+  const setEffectiveCouncilMode = setCouncilMode !== undefined ? setCouncilMode : setLocalCouncilMode;
+  
+  const effectiveToolsState = toolsState !== undefined ? toolsState : localToolsState;
+  const setEffectiveToolsState = setToolsState !== undefined ? setToolsState : setLocalToolsState;
+  
+  const effectiveCouncilConfig = councilConfig !== undefined ? councilConfig : localCouncilConfig;
+  const setEffectiveCouncilConfig = setCouncilConfig !== undefined ? setCouncilConfig : setLocalCouncilConfig;
   
   const [isResizing, setIsResizing] = useState(false);
   const [isTabBarCollapsed, setIsTabBarCollapsed] = useState(true);
@@ -268,7 +334,7 @@ export default function RightPanel({
       <div className="flex items-center justify-between px-4 py-3 border-b border-[#E5E0DA] shrink-0 bg-[#F4F0EB]">
         <div className="flex items-center gap-2">
           {/* Back/Reveal Toggle Button */}
-          {(activeTab === 'canvas' || activeTab === 'artifact') && (
+          {(activeTab === 'canvas' || activeTab === 'artifact' || activeTab === 'browser') && (
             <button
               type="button"
               onClick={() => setIsTabBarCollapsed(!isTabBarCollapsed)}
@@ -300,12 +366,14 @@ export default function RightPanel({
         <div className="flex items-center justify-center gap-1 px-3 py-2 border-b border-[#E5E0DA] bg-[#F4F0EB] shrink-0 animate-slideDown">
           {[
             { key: 'agents' as const, icon: GitBranch, tooltip: 'Agent Tree', dot: null },
+            { key: 'tools' as const, icon: Sliders, tooltip: 'Connectors & Tools', dot: (effectiveCouncilMode || effectiveToolsState.webSearch || effectiveToolsState.exaSearch || effectiveToolsState.kaggle || effectiveToolsState.database || effectiveToolsState.rag) ? 'bg-emerald-500' : null },
             { key: 'files' as const, icon: Paperclip, tooltip: 'Files & Context', dot: null },
             { key: 'preview' as const, icon: Eye, tooltip: 'Live Preview', dot: null },
             { key: 'memory' as const, icon: Brain, tooltip: 'Project Memory', dot: null },
-            { key: 'canvas' as const, icon: Table2, tooltip: 'Data Canvas', dot: activeCanvasId ? 'bg-emerald-500' : null },
-            { key: 'artifact' as const, icon: Boxes, tooltip: 'Artifact Sandbox', dot: artifactCode ? 'bg-purple-500' : null },
+            {key: 'canvas' as const, icon: Table2, tooltip: 'Data Canvas', dot: activeCanvasId ? 'bg-emerald-500' : null },
+            {key: 'artifact' as const, icon: Boxes, tooltip: 'Artifact Sandbox', dot: artifactCode ? 'bg-purple-500' : null },
             ...(isCouncilActive ? [{ key: 'council' as const, icon: Scale, tooltip: 'AI Council', dot: 'bg-amber-500' }] : []),
+            ...(browserSession ? [{ key: 'browser' as const, icon: Globe, tooltip: 'Live Browser', dot: browserSession.status === 'active' ? 'bg-blue-500 animate-pulse' : null }] : []),
           ].map(({ key, icon: Icon, tooltip, dot }) => (
             <button
               key={key}
@@ -329,6 +397,277 @@ export default function RightPanel({
 
       {/* Tab Contents */}
       <div className="flex-grow overflow-y-auto p-4 scroll-smooth flex flex-col">
+        {activeTab === 'tools' && (
+          <div id="workspace-tools-section" className="space-y-4 animate-fadeIn">
+            <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#85827D] uppercase tracking-wider mb-2 font-dmsans">
+              <Sliders className="w-3.5 h-3.5" />
+              <span>Connectors & Tools Config</span>
+            </div>
+
+            {/* 1. Context File Helper */}
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-3">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">1. Master Context File</h3>
+                <button
+                  type="button"
+                  onClick={() => onTabChange('files')}
+                  className="text-[10px] text-primary hover:underline font-bold"
+                >
+                  Manage files →
+                </button>
+              </div>
+              <p className="text-[11px] text-[#5E5B56] leading-relaxed">
+                Add resume or project context files for the agents to analyze and use in their tasks.
+              </p>
+              {project.master_resume ? (
+                <div className="bg-[#F5F9F6] border border-[#D1E7DD] p-2.5 rounded-lg flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="w-4 h-4 text-emerald-600" />
+                    <span className="font-semibold text-xs text-ink truncate leading-tight">
+                      {project.master_resume_filename || 'Uploaded Resume'}
+                    </span>
+                  </div>
+                  <span className="text-[9px] text-emerald-600 font-bold uppercase tracking-tight">Active</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onTabChange('files')}
+                  className="w-full text-center py-2 border border-dashed border-[#C2BCB2] hover:bg-[#FDFBF9] text-xs font-semibold text-[#5E5B56] rounded-xl transition-colors cursor-pointer"
+                >
+                  + Upload Context File
+                </button>
+              )}
+            </div>
+
+            {/* 2. Connectors & Tools Toggles */}
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-3">
+              <h3 className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">2. Integrations & Search</h3>
+              <p className="text-[11px] text-[#5E5B56] leading-relaxed">
+                Toggle external data sources, search engines, and local databases for model usage.
+              </p>
+
+              <div className="border border-[#F4F0EB] bg-[#FBF9F6]/50 rounded-xl p-1.5 space-y-1">
+                {/* Web Search */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F4F0EB]/60 transition-colors text-xs font-semibold text-[#191919]">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-4 h-4 text-[#85827D]" />
+                    <div className="flex flex-col">
+                      <span>Tavily Web Search</span>
+                      <span className="text-[10px] text-[#85827D] font-normal">Standard real-time google/bing search</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEffectiveToolsState(prev => ({ ...prev, webSearch: !prev.webSearch }))}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                      effectiveToolsState.webSearch ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      effectiveToolsState.webSearch ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Exa Search */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F4F0EB]/60 transition-colors text-xs font-semibold text-[#191919]">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-4 h-4 text-purple-600" />
+                    <div className="flex flex-col">
+                      <span>Exa Neural Search</span>
+                      <span className="text-[10px] text-[#85827D] font-normal">Neural/embeddings web database</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEffectiveToolsState(prev => ({ ...prev, exaSearch: !prev.exaSearch }))}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                      effectiveToolsState.exaSearch ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      effectiveToolsState.exaSearch ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Kaggle */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F4F0EB]/60 transition-colors text-xs font-semibold text-[#191919]">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-4 h-4 text-blue-600" />
+                    <div className="flex flex-col">
+                      <span>Kaggle Datasets</span>
+                      <span className="text-[10px] text-[#85827D] font-normal">Search and pull from Kaggle repository</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEffectiveToolsState(prev => ({ ...prev, kaggle: !prev.kaggle }))}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                      effectiveToolsState.kaggle ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      effectiveToolsState.kaggle ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Supabase SQL */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F4F0EB]/60 transition-colors text-xs font-semibold text-[#191919]">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-4 h-4 text-emerald-600" />
+                    <div className="flex flex-col">
+                      <span>Supabase PostgreSQL</span>
+                      <span className="text-[10px] text-[#85827D] font-normal">Direct query execution & table management</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEffectiveToolsState(prev => ({ ...prev, database: !prev.database }))}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                      effectiveToolsState.database ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      effectiveToolsState.database ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+
+                {/* Qdrant RAG */}
+                <div className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F4F0EB]/60 transition-colors text-xs font-semibold text-[#191919]">
+                  <div className="flex items-center gap-2.5">
+                    <Database className="w-4 h-4 text-amber-600" />
+                    <div className="flex flex-col">
+                      <span>Qdrant Vector RAG</span>
+                      <span className="text-[10px] text-[#85827D] font-normal">Vector database semantic context retrieval</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEffectiveToolsState(prev => ({ ...prev, rag: !prev.rag }))}
+                    className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                      effectiveToolsState.rag ? 'bg-emerald-600' : 'bg-[#E5E0DA]'
+                    }`}
+                  >
+                    <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                      effectiveToolsState.rag ? 'translate-x-4' : 'translate-x-0'
+                    }`} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. AI Council Config */}
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Brain className={`w-4.5 h-4.5 ${effectiveCouncilMode ? 'text-purple-600' : 'text-[#85827D]'}`} />
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">3. AI Council Mode</span>
+                    <span className="text-[9px] text-purple-700 bg-purple-50 border border-purple-100 px-1 rounded-sm font-bold uppercase tracking-tight mt-0.5 self-start">Cross-LLM Debate</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEffectiveCouncilMode(!effectiveCouncilMode)}
+                  className={`w-9 h-5 rounded-full p-0.5 transition-colors duration-200 cursor-pointer ${
+                    effectiveCouncilMode ? 'bg-[#5B39E0]' : 'bg-[#E5E0DA]'
+                  }`}
+                >
+                  <div className={`w-4 h-4 rounded-full bg-white transition-transform duration-200 ${
+                    effectiveCouncilMode ? 'translate-x-4' : 'translate-x-0'
+                  }`} />
+                </button>
+              </div>
+
+              {effectiveCouncilMode && (
+                <div className="border border-[#F4F0EB] bg-[#FDFBF9] rounded-xl p-3 space-y-3 animate-fadeIn">
+                  <div className="flex items-center justify-between pb-1 border-b border-[#F4F0EB]">
+                    <span className="text-[10px] font-bold text-[#85827D] uppercase tracking-wider">
+                      Council Seats ({effectiveCouncilConfig.seats.length})
+                    </span>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={effectiveCouncilConfig.enableVerdict}
+                        onChange={(e) => setEffectiveCouncilConfig(prev => ({ ...prev, enableVerdict: e.target.checked }))}
+                        className="rounded text-purple-600 focus:ring-purple-500 w-3.5 h-3.5"
+                      />
+                      <span className="text-[10px] text-[#5E5B56] font-bold">Arbiter Verdict</span>
+                    </label>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {effectiveCouncilConfig.seats.map((seat: any, index: number) => (
+                      <div key={index} className="flex items-center gap-2 bg-white p-2 border border-[#EBE5DC] rounded-xl shadow-3xs">
+                        <input
+                          type="text"
+                          value={seat.name}
+                          onChange={(e) => {
+                            const newSeats = [...effectiveCouncilConfig.seats];
+                            newSeats[index] = { ...newSeats[index], name: e.target.value, role: `${e.target.value} Seat` };
+                            setEffectiveCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                          }}
+                          className="w-20 text-xs bg-transparent border-0 border-b border-[#E5E0DA] focus:border-purple-500 px-1 py-0.5 font-bold text-[#191919] focus:outline-none"
+                          placeholder="Seat name"
+                        />
+                        <select
+                          value={seat.model}
+                          onChange={(e) => {
+                            const newSeats = [...effectiveCouncilConfig.seats];
+                            newSeats[index] = { ...newSeats[index], model: e.target.value };
+                            setEffectiveCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                          }}
+                          className="flex-grow text-[11px] bg-transparent border border-[#E5E0DA] rounded-lg px-2 py-1 font-medium text-[#5E5B56] focus:outline-none max-w-[150px] truncate"
+                        >
+                          {AVAILABLE_MODELS.map((model) => (
+                            <option key={model.id} value={model.id}>
+                              {model.name}
+                            </option>
+                          ))}
+                        </select>
+                        {effectiveCouncilConfig.seats.length > 2 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newSeats = effectiveCouncilConfig.seats.filter((_: any, i: number) => i !== index);
+                              setEffectiveCouncilConfig(prev => ({ ...prev, seats: newSeats }));
+                            }}
+                            className="p-1 text-red-500 hover:bg-red-50 rounded-lg text-sm transition-colors font-bold"
+                            title="Remove seat"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {effectiveCouncilConfig.seats.length < 6 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newSeat = {
+                          name: `Seat ${effectiveCouncilConfig.seats.length + 1}`,
+                          role: `Seat ${effectiveCouncilConfig.seats.length + 1} Seat`,
+                          model: AVAILABLE_MODELS[0].id
+                        };
+                        setEffectiveCouncilConfig(prev => ({ ...prev, seats: [...prev.seats, newSeat] }));
+                      }}
+                      className="w-full text-center py-2 border border-dashed border-[#C2BCB2] hover:bg-[#F4F0EB] text-xs font-bold text-[#5E5B56] rounded-xl transition-colors cursor-pointer"
+                    >
+                      + Add Seat to Council
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === 'council' && (
           <div id="workspace-council-section" className="flex-grow flex flex-col h-full min-h-[400px] overflow-hidden">
             <CouncilDebateView agents={agents} projectId={project.id} />
@@ -372,6 +711,12 @@ export default function RightPanel({
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'browser' && (
+          <div id="workspace-browser-section" className="flex-grow flex flex-col h-full min-h-[400px] overflow-hidden">
+            <LiveBrowser session={browserSession} />
           </div>
         )}
 

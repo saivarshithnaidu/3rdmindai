@@ -5,11 +5,13 @@ import { motion } from 'framer-motion';
 import { Message } from '../../types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, ExternalLink, Download, Printer } from 'lucide-react';
+import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, ExternalLink, Download, Printer, ThumbsUp, ThumbsDown, Pencil, RotateCcw } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
   onOpenPreview?: (code: string, title: string) => void;
+  onEditMessage?: (messageId: string, newContent: string) => void;
+  onRegenerateMessage?: (messageId: string) => void;
 }
 
 interface ToolCallData {
@@ -546,19 +548,137 @@ function CodeBlock({ language, code, onOpenPreview }: { language: string; code: 
 
 import ToolCallBlock from './ToolCallBlock';
 
-export default function MessageBubble({ message, onOpenPreview }: MessageBubbleProps) {
+export default function MessageBubble({ message, onOpenPreview, onEditMessage, onRegenerateMessage }: MessageBubbleProps) {
   const { role, content } = message;
+  const [toolCalls, setToolCalls] = React.useState<any[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(content);
+  const [isCopied, setIsCopied] = useState(false);
+  
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(() => {
+    if (typeof window !== 'undefined' && message.id) {
+      const saved = localStorage.getItem(`message-feedback-${message.id}`);
+      return saved as 'up' | 'down' | null;
+    }
+    return null;
+  });
+
+  React.useEffect(() => {
+    setEditContent(content);
+  }, [content]);
+
+  React.useEffect(() => {
+    if (role === 'assistant' && message.id) {
+      fetch(`/api/tool-calls?projectId=${message.project_id}&messageId=${message.id}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (Array.isArray(data)) {
+            setToolCalls(data);
+          }
+        })
+        .catch((err) => console.warn('Failed to fetch tool calls for message:', err));
+    }
+  }, [role, message.id, message.project_id]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy message:', err);
+    }
+  };
+
+  const handleFeedback = (type: 'up' | 'down') => {
+    const nextFeedback = feedback === type ? null : type;
+    setFeedback(nextFeedback);
+    if (message.id) {
+      if (nextFeedback) {
+        localStorage.setItem(`message-feedback-${message.id}`, nextFeedback);
+      } else {
+        localStorage.removeItem(`message-feedback-${message.id}`);
+      }
+    }
+  };
 
   if (role === 'user') {
+    if (isEditing) {
+      return (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="flex flex-col items-end w-full font-dmsans"
+        >
+          <div className="w-full max-w-[75%] bg-[#FFFFFF] border border-[#E5E0DA] rounded-2xl p-3 shadow-xs flex flex-col gap-2">
+            <textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              className="w-full min-h-[60px] bg-transparent border-0 text-[#191919] text-xs resize-none focus:outline-none leading-relaxed font-dmsans"
+            />
+            <div className="flex items-center justify-end gap-2 border-t border-[#FBF9F6] pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditContent(content);
+                }}
+                className="px-2.5 py-1 rounded-lg border border-[#E5E0DA] hover:bg-[#F4F0EB] text-[#5E5B56] text-[10px] font-bold cursor-pointer transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (editContent.trim() && onEditMessage && message.id) {
+                    onEditMessage(message.id, editContent);
+                    setIsEditing(false);
+                  }
+                }}
+                className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-active text-white text-[10px] font-bold cursor-pointer transition-colors"
+              >
+                Save & Resubmit
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      );
+    }
+
     return (
       <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="flex flex-col items-end w-full font-dmsans"
+        className="flex flex-col items-end w-full font-dmsans group"
       >
-        <div className="bg-white border border-hairline text-ink rounded-2xl rounded-tr-sm px-4 py-2.5 max-w-[75%] text-xs leading-relaxed shadow-xs">
-          {content}
+        <div className="flex items-center gap-2 max-w-[75%]">
+          {/* User Bubble Hover actions */}
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 flex items-center gap-1 bg-[#FFFFFF]/90 border border-[#E5E0DA] rounded-full p-0.5 shadow-2xs select-none">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="p-1 hover:bg-[#F4F0EB] text-[#85827D] hover:text-[#191919] rounded-full transition-colors cursor-pointer"
+              title="Copy message"
+            >
+              {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            {onEditMessage && (
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="p-1 hover:bg-[#F4F0EB] text-[#85827D] hover:text-[#191919] rounded-full transition-colors cursor-pointer"
+                title="Edit message"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+
+          <div className="bg-white border border-hairline text-ink rounded-2xl rounded-tr-sm px-4 py-2.5 text-xs leading-relaxed shadow-xs select-text">
+            {content}
+          </div>
         </div>
       </motion.div>
     );
@@ -580,7 +700,7 @@ export default function MessageBubble({ message, onOpenPreview }: MessageBubbleP
         transition={{ duration: 0.2, ease: 'easeOut' }}
         className="flex flex-col items-start w-full font-dmsans"
       >
-        <div className="bg-[#ECE9FC] border border-[#D5CFF8] text-[#5B39E0] rounded-2xl rounded-tl-sm px-4 py-2.5 text-xs max-w-[85%] font-bold leading-relaxed shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+        <div className="bg-[#ECE9FC] border border-[#D5CFF8] text-[#5B39E0] rounded-2xl rounded-tl-sm px-4 py-2.5 text-xs max-w-[85%] font-bold leading-relaxed shadow-[0_1px_3px_rgba(0,0,0,0.02)] select-text">
           {content}
         </div>
       </motion.div>
@@ -595,7 +715,7 @@ export default function MessageBubble({ message, onOpenPreview }: MessageBubbleP
         transition={{ duration: 0.2, ease: 'easeOut' }}
         className="flex flex-col items-center w-full my-4 font-dmsans"
       >
-        <div className="bg-[#FEE2E2] border border-[#FCA5A5] text-[#EF4444] rounded-full px-4 py-1 text-[10px] font-bold shadow-2xs">
+        <div className="bg-[#FEE2E2] border border-[#FCA5A5] text-[#EF4444] rounded-full px-4 py-1 text-[10px] font-bold shadow-2xs select-text">
           {content}
         </div>
       </motion.div>
@@ -608,7 +728,7 @@ export default function MessageBubble({ message, onOpenPreview }: MessageBubbleP
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2, ease: 'easeOut' }}
-      className="flex flex-col items-start w-full font-dmsans"
+      className="flex flex-col items-start w-full font-dmsans group"
     >
       <div className="w-full text-ink select-text">
         <ReactMarkdown
@@ -656,6 +776,75 @@ export default function MessageBubble({ message, onOpenPreview }: MessageBubbleP
           {content}
         </ReactMarkdown>
       </div>
+      {toolCalls.length > 0 && (
+        <div className="w-full mt-3 space-y-2">
+          {toolCalls.map((tc) => (
+            <ToolCallBlock key={tc.id} toolCall={tc} />
+          ))}
+        </div>
+      )}
+
+      {/* Assistant bubble actions row */}
+      {message.id && (
+        <div className={`flex items-center gap-2.5 mt-2 border-t border-[#FBF9F6]/20 pt-1.5 self-start select-none transition-opacity duration-150 ${
+          feedback ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+        }`}>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1 text-[#85827D] hover:text-[#191919] transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-[#F4F0EB]/50 text-[10px] font-bold"
+            title="Copy response"
+          >
+            {isCopied ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-emerald-600" />
+                <span className="text-emerald-600">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+
+          {onRegenerateMessage && (
+            <button
+              type="button"
+              onClick={() => onRegenerateMessage(message.id)}
+              className="flex items-center gap-1 text-[#85827D] hover:text-[#191919] transition-colors cursor-pointer px-1.5 py-0.5 rounded hover:bg-[#F4F0EB]/50 text-[10px] font-bold"
+              title="Regenerate response"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Retry</span>
+            </button>
+          )}
+
+          <div className="h-3.5 w-px bg-[#E5E0DA]" />
+
+          <button
+            type="button"
+            onClick={() => handleFeedback('up')}
+            className={`p-1 rounded hover:bg-[#F4F0EB]/50 transition-colors cursor-pointer ${
+              feedback === 'up' ? 'text-emerald-600' : 'text-[#85827D] hover:text-[#191919]'
+            }`}
+            title="Thumbs up"
+          >
+            <ThumbsUp className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleFeedback('down')}
+            className={`p-1 rounded hover:bg-[#F4F0EB]/50 transition-colors cursor-pointer ${
+              feedback === 'down' ? 'text-rose-600' : 'text-[#85827D] hover:text-[#191919]'
+            }`}
+            title="Thumbs down"
+          >
+            <ThumbsDown className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

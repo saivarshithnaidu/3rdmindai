@@ -9,8 +9,10 @@ import AgentBreadcrumb from './AgentBreadcrumb';
 import { Project, Agent, Message } from '../../types';
 import { supabaseService } from '../../services/supabase.service';
 import { Share2, Settings, PanelRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { DEFAULT_ORCHESTRATOR_MODEL } from '../../lib/constants';
 import ConnectorsPage from '../connectors/ConnectorsPage';
+import ScraperPicker from '../browser/ScraperPicker';
 
 interface WorkspaceLayoutProps {
   initialProject: Project;
@@ -23,6 +25,7 @@ export default function WorkspaceLayout({
   initialAgents,
   allProjects,
 }: WorkspaceLayoutProps) {
+  const router = useRouter();
   const [project, setProject] = useState<Project>(initialProject);
   const [agents, setAgents] = useState<Agent[]>(initialAgents);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -48,15 +51,16 @@ export default function WorkspaceLayout({
   const [selectedModel, setSelectedModel] = useState(DEFAULT_ORCHESTRATOR_MODEL);
   const [isOrchestratorLoading, setIsOrchestratorLoading] = useState(false);
   const [activeNavItem, setActiveNavItem] = useState('Chats');
-  const [activeRightTab, setActiveRightTab] = useState<'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council'>('agents');
+  const [activeRightTab, setActiveRightTab] = useState<'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools'>('agents');
   const [activeConnectorsCount, setActiveConnectorsCount] = useState<number>(0);
 
   const fetchActiveConnectorsCount = useCallback(async () => {
     try {
-      const response = await fetch('/api/connectors/list');
+      const response = await fetch('/api/connectors/list?userId=00000000-0000-0000-0000-000000000000');
       if (response.ok) {
         const data = await response.json();
-        const activeCount = data.filter((c: any) => c.isActive).length;
+        const list = data && Array.isArray(data.connectors) ? data.connectors : Array.isArray(data) ? data : [];
+        const activeCount = list.filter((c: any) => c.isConnected || c.isActive).length;
         setActiveConnectorsCount(activeCount);
       }
     } catch (e) {
@@ -67,6 +71,67 @@ export default function WorkspaceLayout({
   useEffect(() => {
     fetchActiveConnectorsCount();
   }, [activeNavItem, fetchActiveConnectorsCount]);
+
+  const [browserSessions, setBrowserSessions] = useState<any[]>([]);
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [isBrowserPickerOpen, setIsBrowserPickerOpen] = useState(false);
+
+  // Fetch and subscribe to browser sessions for the project
+  useEffect(() => {
+    if (!project?.id) return;
+
+    const fetchBrowserSessions = async () => {
+      try {
+        const response = await fetch(`/api/browser/sessions?projectId=${project.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setBrowserSessions(data || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch browser sessions:', err);
+      }
+    };
+
+    fetchBrowserSessions();
+
+    const supabase = supabaseService.getClient();
+    const browserSessionsChannel = supabase
+      .channel(`project-browser-sessions-${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'browser_sessions',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => {
+          fetchBrowserSessions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(browserSessionsChannel);
+    };
+  }, [project.id]);
+
+  // Compute active session and auto-open browser tab on new active sessions
+  useEffect(() => {
+    const active = browserSessions.find((s) => s.status === 'active');
+    if (active) {
+      setActiveSession(active);
+      setActiveRightTab('browser');
+      setIsRightPanelOpen(true);
+      if (active.canvas_id) {
+        setActiveCanvasId(active.canvas_id);
+      }
+    } else if (browserSessions.length > 0) {
+      setActiveSession(browserSessions[0]);
+    } else {
+      setActiveSession(null);
+    }
+  }, [browserSessions]);
   const [hasSwitchedToCouncil, setHasSwitchedToCouncil] = useState(false);
   const [previewContent, setPreviewContent] = useState<string>('');
   const [previewTitle, setPreviewTitle] = useState<string>('Live Preview');
@@ -95,6 +160,33 @@ export default function WorkspaceLayout({
   const [artifactType, setArtifactType] = useState<string>('');
   const [artifactVersion, setArtifactVersion] = useState<number>(1);
   const [chatInputValue, setChatInputValue] = useState<string>('');
+
+  const [councilMode, setCouncilMode] = useState(false);
+  const [toolsState, setToolsState] = useState({
+    webSearch: true,
+    exaSearch: false,
+    kaggle: false,
+    database: false,
+    rag: false
+  });
+  const [councilConfig, setCouncilConfig] = useState({
+    seats: [
+      { name: 'Creative', role: 'Creative Seat', model: 'google/gemini-pro-1.5' },
+      { name: 'Critic', role: 'Critic Seat', model: 'openai/gpt-4o' },
+      { name: 'Auditor', role: 'Auditor Seat', model: 'deepseek/deepseek-chat' },
+      { name: 'General', role: 'General Seat', model: 'meta-llama/llama-3-70b-instruct' }
+    ],
+    enableVerdict: true
+  });
+
+  const handleToggleToolsPanel = useCallback(() => {
+    if (activeRightTab === 'tools' && isRightPanelOpen) {
+      setIsRightPanelOpen(false);
+    } else {
+      setActiveRightTab('tools');
+      setIsRightPanelOpen(true);
+    }
+  }, [activeRightTab, isRightPanelOpen]);
 
   // Auto-expand to 50% split when a Canvas or Artifact becomes active
   useEffect(() => {
@@ -217,6 +309,57 @@ export default function WorkspaceLayout({
     };
   }, [project.id, fetchMessages, fetchAgents]);
 
+  const triggerOrchestratorChat = async (model: string, options?: any) => {
+    if (!activeAgent) return;
+    try {
+      // Set orchestrator agent status to running
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'running' }),
+      });
+
+      // Trigger chat completion stream
+      const chatRes = await fetch('/api/orchestrator/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId: project.id,
+          agentId: activeAgent.id,
+          model,
+          options,
+        }),
+      });
+
+      if (!chatRes.ok) throw new Error('Chat generation failed');
+
+      // Consume stream to wait for completion
+      if (chatRes.body) {
+        const reader = chatRes.body.getReader();
+        while (true) {
+          const { done } = await reader.read();
+          if (done) break;
+        }
+      }
+
+      // Update status back to done
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'done' }),
+      });
+    } catch (e) {
+      console.error('Error in orchestrator chat stream:', e);
+      // Mark as error status
+      await fetch(`/api/agent/${activeAgent.id}/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'error' }),
+      });
+      throw e;
+    }
+  };
+
   const handleSendMessage = async (content: string, model: string, options?: any) => {
     if (!activeAgent || activeAgent.type !== 'orchestrator') return;
 
@@ -289,7 +432,69 @@ export default function WorkspaceLayout({
       console.warn('Canvas detection check failed:', e);
     }
 
-    // Check 2: Artifact Request Check (New or Update)
+    // Check 2: Browser Agent Request Check
+    try {
+      const browserDetectRes = await fetch('/api/browser/detect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content }),
+      });
+
+      if (browserDetectRes.ok) {
+        const detection = await browserDetectRes.json();
+        if (detection.needsBrowser && detection.scraper) {
+          // 1. Save user message to database
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'user',
+              content,
+            }),
+          });
+
+          // 2. Save initial assistant message indicating browser is launching
+          await fetch(`/api/agent/${activeAgent.id}/messages`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              role: 'assistant',
+              content: `🌐 **Opening browser to find this data...** Running browser automation with query "${detection.query}"`,
+            }),
+          });
+
+          // 3. Trigger browser scraping
+          const scrapeRes = await fetch('/api/browser/scrape', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              projectId: project.id,
+              agentId: activeAgent.id,
+              scraperType: detection.scraper,
+              query: detection.query,
+              maxResults: detection.maxResults
+            }),
+          });
+
+          if (scrapeRes.ok) {
+            const scrapeData = await scrapeRes.json();
+            // 4. Set active canvas and tab to browser
+            setActiveCanvasId(scrapeData.canvasId);
+            setIsRightPanelOpen(true);
+            setActiveRightTab('browser');
+          }
+
+          setIsOrchestratorLoading(false);
+          return; // Skip standard chat pipeline
+        }
+      }
+    } catch (err) {
+      console.warn('Browser detection check failed:', err);
+    }
+
+    // Check 3: Artifact Request Check (New or Update)
     try {
       if (activeArtifactId && artifactCode) {
         // This is a follow-up/update change request for the active artifact
@@ -510,51 +715,63 @@ export default function WorkspaceLayout({
 
       if (!saveRes.ok) throw new Error('Failed to save message');
 
-      // 2. Set orchestrator agent status to running
-      await fetch(`/api/agent/${activeAgent.id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'running' }),
-      });
-
-      // 3. Trigger chat completion stream
-      const chatRes = await fetch('/api/orchestrator/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectId: project.id,
-          agentId: activeAgent.id,
-          model,
-          options,
-        }),
-      });
-
-      if (!chatRes.ok) throw new Error('Chat generation failed');
-
-      // Consume stream to wait for completion
-      if (chatRes.body) {
-        const reader = chatRes.body.getReader();
-        while (true) {
-          const { done } = await reader.read();
-          if (done) break;
-        }
-      }
-
-      // 4. Update status back to done
-      await fetch(`/api/agent/${activeAgent.id}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'done' }),
-      });
+      // 2. Trigger orchestrator chat stream and wait for done
+      await triggerOrchestratorChat(model, options);
 
     } catch (e) {
       console.error('Error sending message:', e);
-      // Mark as error status
-      await fetch(`/api/agent/${activeAgent.id}/status`, {
-        method: 'POST',
+    } finally {
+      setIsOrchestratorLoading(false);
+    }
+  };
+
+  const handleEditMessage = async (messageId: string, newContent: string) => {
+    if (!activeAgent) return;
+    setIsOrchestratorLoading(true);
+    try {
+      // 1. Update the message content in the database
+      const updateRes = await fetch(`/api/message/${messageId}`, {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'error' }),
+        body: JSON.stringify({ content: newContent }),
       });
+      if (!updateRes.ok) throw new Error('Failed to update message');
+
+      // 2. Truncate subsequent messages (strictly after, inclusive=false)
+      const truncateRes = await fetch(`/api/message/${messageId}?truncate=true&inclusive=false`, {
+        method: 'DELETE',
+      });
+      if (!truncateRes.ok) throw new Error('Failed to truncate subsequent messages');
+
+      // Refresh local messages state immediately
+      await fetchMessages();
+
+      // 3. Trigger orchestrator chat stream
+      await triggerOrchestratorChat(selectedModel);
+    } catch (e) {
+      console.error('Error editing message:', e);
+    } finally {
+      setIsOrchestratorLoading(false);
+    }
+  };
+
+  const handleRegenerateMessage = async (messageId: string) => {
+    if (!activeAgent) return;
+    setIsOrchestratorLoading(true);
+    try {
+      // Truncate starting from this assistant message (inclusive=true)
+      const truncateRes = await fetch(`/api/message/${messageId}?truncate=true&inclusive=true`, {
+        method: 'DELETE',
+      });
+      if (!truncateRes.ok) throw new Error('Failed to delete assistant message for regeneration');
+
+      // Refresh messages
+      await fetchMessages();
+
+      // Trigger orchestrator chat stream
+      await triggerOrchestratorChat(selectedModel);
+    } catch (e) {
+      console.error('Error regenerating message:', e);
     } finally {
       setIsOrchestratorLoading(false);
     }
@@ -595,14 +812,29 @@ export default function WorkspaceLayout({
               isHeaderMode={true}
             />
 
-            {activeConnectorsCount > 0 && (
-              <>
-                <span className="text-muted select-none text-xs px-0.5 shrink-0">/</span>
-                <span className="text-[10px] bg-[#EBE5DC]/55 text-muted border border-hairline/70 font-mono px-2.5 py-0.5 rounded-full shrink-0">
-                  {activeConnectorsCount} connector{activeConnectorsCount > 1 ? 's' : ''} active
+            <>
+              <span className="text-muted select-none text-xs px-0.5 shrink-0">/</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveNavItem('Connectors');
+                  router.push('/connectors');
+                }}
+                className={`flex items-center gap-1.5 text-[10px] font-mono px-2.5 py-0.5 rounded-full border border-hairline/70 shrink-0 cursor-pointer transition-colors ${
+                  activeConnectorsCount > 0
+                    ? 'bg-[#EBE5DC]/55 text-muted hover:text-ink hover:bg-surface-card'
+                    : 'bg-transparent text-muted-soft hover:text-ink font-semibold'
+                }`}
+              >
+                <i className="ti ti-plug-connected text-[10px]" />
+                <span>
+                  {activeConnectorsCount > 0 
+                    ? `${activeConnectorsCount} connector${activeConnectorsCount > 1 ? 's' : ''}` 
+                    : 'No connectors'
+                  }
                 </span>
-              </>
-            )}
+              </button>
+            </>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
@@ -645,6 +877,8 @@ export default function WorkspaceLayout({
               onSubmit={handleSendMessage}
               projectId={project.id}
               onOpenPreview={handleOpenPreview}
+              onEditMessage={handleEditMessage}
+              onRegenerateMessage={handleRegenerateMessage}
               onFileUploaded={(text, filename) => {
                 setProject(prev => ({
                   ...prev,
@@ -656,6 +890,15 @@ export default function WorkspaceLayout({
               onInputValueChange={setChatInputValue}
               activeCanvasId={activeCanvasId}
               activeArtifactId={activeArtifactId}
+              onOpenBrowserPicker={() => setIsBrowserPickerOpen(true)}
+              councilMode={councilMode}
+              setCouncilMode={setCouncilMode}
+              toolsState={toolsState}
+              setToolsState={setToolsState}
+              councilConfig={councilConfig}
+              setCouncilConfig={setCouncilConfig}
+              onToggleToolsPanel={handleToggleToolsPanel}
+              isToolsPanelActive={isRightPanelOpen && activeRightTab === 'tools'}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-[#8A8780] italic">
@@ -685,9 +928,27 @@ export default function WorkspaceLayout({
             onSelectPreset={handleSelectPreset}
             panelWidth={rightPanelWidth}
             onPanelWidthChange={handlePanelWidthChange}
+            browserSession={activeSession}
+            councilMode={councilMode}
+            setCouncilMode={setCouncilMode}
+            toolsState={toolsState}
+            setToolsState={setToolsState}
+            councilConfig={councilConfig}
+            setCouncilConfig={setCouncilConfig}
           />
         </div>
       </div>
+
+      <ScraperPicker
+        isOpen={isBrowserPickerOpen}
+        onClose={() => setIsBrowserPickerOpen(false)}
+        projectId={project.id}
+        onScrapeStarted={(canvasId) => {
+          setActiveCanvasId(canvasId);
+          setActiveRightTab('browser');
+          setIsRightPanelOpen(true);
+        }}
+      />
     </div>
   );
 }

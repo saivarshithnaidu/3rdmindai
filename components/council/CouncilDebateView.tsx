@@ -38,12 +38,31 @@ export default function CouncilDebateView({ agents, projectId }: CouncilDebateVi
   const [dbMatrixNeedsMigration, setDbMatrixNeedsMigration] = useState(false);
   const [copiedSql, setCopiedSql] = useState(false);
 
-  // 1. Find the council manager agent
-  const councilManager = agents.find(a => 
-    a.name.toLowerCase().includes('council') || 
-    a.task?.toLowerCase().includes('council') ||
-    a.task?.toLowerCase().includes('debate')
+  // Error tracking state
+  const [managerError, setManagerError] = useState<string | null>(null);
+
+  // Find all council manager agents (exclude root orchestrator by requiring parent_agent_id !== null)
+  const councils = agents.filter(a => 
+    a.parent_agent_id !== null && 
+    (a.name.toLowerCase().includes('council') || 
+     a.task?.toLowerCase().includes('council') ||
+     a.task?.toLowerCase().includes('debate'))
   );
+
+  const [activeCouncilId, setActiveCouncilId] = useState<string | null>(null);
+
+  // Sync activeCouncilId when councils list loads or changes
+  useEffect(() => {
+    if (councils.length > 0) {
+      if (!activeCouncilId || !councils.some(c => c.id === activeCouncilId)) {
+        setActiveCouncilId(councils[0].id);
+      }
+    } else {
+      setActiveCouncilId(null);
+    }
+  }, [agents]);
+
+  const councilManager = councils.find(c => c.id === activeCouncilId);
 
   // 2. Filter child agents of the council manager (exclude ClaimExtractor from timeline cards if desired, but keep Verdict)
   const councilSeats = councilManager 
@@ -72,9 +91,13 @@ export default function CouncilDebateView({ agents, projectId }: CouncilDebateVi
     return timeA - timeB;
   });
 
-  // Fetch Matrix data from database in real-time
+  // Fetch Matrix data and check error logs from database
   useEffect(() => {
-    if (!councilManager) return;
+    if (!councilManager) {
+      setMatrixData(null);
+      setManagerError(null);
+      return;
+    }
     
     const fetchMatrix = async () => {
       try {
@@ -91,8 +114,8 @@ export default function CouncilDebateView({ agents, projectId }: CouncilDebateVi
           } else {
             console.error('Error fetching council matrix:', error);
           }
-        } else if (data) {
-          setMatrixData(data);
+        } else {
+          setMatrixData(data || null);
           setDbMatrixNeedsMigration(false);
         }
       } catch (err) {
@@ -100,7 +123,29 @@ export default function CouncilDebateView({ agents, projectId }: CouncilDebateVi
       }
     };
 
+    const checkError = async () => {
+      if (councilManager.status === 'error') {
+        try {
+          const res = await fetch(`/api/agent/${councilManager.id}/messages`);
+          if (res.ok) {
+            const data: Message[] = await res.json();
+            const systemError = data.find(m => m.role === 'system');
+            if (systemError) {
+              setManagerError(systemError.content);
+              return;
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+        setManagerError('An error occurred during the council debate execution.');
+      } else {
+        setManagerError(null);
+      }
+    };
+
     fetchMatrix();
+    checkError();
 
     // Subscribe to realtime changes on council_matrix
     const supabase = supabaseService.getClient();
@@ -249,6 +294,25 @@ ALTER PUBLICATION supabase_realtime ADD TABLE council_matrix;`;
   return (
     <div className="flex-grow flex flex-col h-full overflow-hidden select-text animate-fadeIn gap-4">
       
+      {/* Dropdown Selector for Multiple Councils */}
+      {councils.length > 1 && (
+        <div className="flex items-center gap-2 px-3 py-2 border border-[#E5E0DA] bg-white rounded-xl shadow-3xs shrink-0">
+          <Scale className="w-4 h-4 text-[#D97757]" />
+          <span className="text-[10px] font-black uppercase text-[#85827D] tracking-wider font-dmsans">Active Council Panel:</span>
+          <select
+            value={activeCouncilId || ''}
+            onChange={(e) => setActiveCouncilId(e.target.value)}
+            className="flex-1 bg-transparent border-0 text-xs font-bold text-[#191919] focus:outline-hidden cursor-pointer"
+          >
+            {councils.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Database Schema Helper Warning */}
       {dbMatrixNeedsMigration && (
         <div className="bg-amber-50 border border-amber-250 text-amber-900 p-3.5 rounded-xl text-xs space-y-2 animate-fadeIn shrink-0 select-text">
@@ -321,9 +385,15 @@ ALTER PUBLICATION supabase_realtime ADD TABLE council_matrix;`;
 
           {/* Sub-tab view contents */}
           <div className="p-4 flex-grow overflow-y-auto min-h-0 flex flex-col justify-between">
-            {!matrixData ? (
+            {managerError ? (
+              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-xs text-rose-700 bg-rose-50 border border-rose-150 rounded-2xl max-w-md mx-auto my-6 font-dmsans shrink-0">
+                <AlertCircle className="w-6 h-6 text-rose-500 mb-2" />
+                <p className="font-bold">Debate Execution Error</p>
+                <p className="mt-1.5 opacity-90 leading-relaxed font-mono text-[9px] break-all">{managerError}</p>
+              </div>
+            ) : !matrixData ? (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-[11px] text-[#85827D] italic py-16">
-                <Loader2 className="w-5 h-5 text-purple-600 animate-spin mb-2" />
+                <Loader2 className="w-5 h-5 text-[#D97757] animate-spin mb-2" />
                 <span>Convene debate loop. Spawning Extractor agent to build consensus matrix...</span>
               </div>
             ) : (

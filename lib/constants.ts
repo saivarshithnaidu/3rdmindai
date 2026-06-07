@@ -9,8 +9,8 @@ export const AVAILABLE_MODELS: ModelOption[] = [
     provider: 'DeepSeek',
   },
   {
-    id: 'google/gemini-pro-1.5',
-    name: 'Gemini 1.5 Pro',
+    id: 'google/gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
     provider: 'Google',
   },
   {

@@ -9,6 +9,8 @@ export interface Project {
   user_id?: string | null;
   master_resume?: string | null;
   master_resume_filename?: string | null;
+  autonomous_mode?: boolean;
+  autonomous_level?: AutonomousLevel;
   created_at?: string;
 }
 
@@ -106,6 +108,7 @@ export interface Connector {
   id: string;
   project_id?: string | null;
   user_id?: string | null;
+  slug?: string;
   name: string;
   category: string;
   description: string;
@@ -115,13 +118,38 @@ export interface Connector {
   toolsAvailable?: number;
   docsUrl?: string;
   icon?: string;
+  api_key?: string | null;
+  access_token?: string | null;
+  refresh_token?: string | null;
+  token_expiry?: string | null;
+  scopes?: string[] | null;
+  metadata?: Record<string, any>;
+}
+
+export interface ConnectorConfig {
+  slug: string;
+  name: string;
+  category: 'productivity' | 'communication' | 'developer' | 'search' | 'storage' | 'crm' | 'finance' | 'ai' | 'data';
+  description: string;
+  authType: 'oauth' | 'api_key' | 'none';
+  icon: string;
+  docsUrl: string;
+  scopes?: string[];
+  keyLabel?: string;
+  keyPlaceholder?: string;
+  keyDocsUrl?: string;
+  serverUrl: string;
+  tools: string[];
+  isConnected?: boolean;
+  toolsAvailable?: number;
 }
 
 export interface MCPTool {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
-  connectorId: string;
+  connectorId?: string;
+  connectorSlug?: string;
   connectorName: string;
 }
 
@@ -130,7 +158,8 @@ export interface ToolCall {
   project_id: string;
   agent_id: string;
   message_id?: string | null;
-  connector_id: string;
+  connector_id?: string;
+  connector_slug?: string;
   tool_name: string;
   params: Record<string, unknown>;
   result: Record<string, unknown>;
@@ -138,4 +167,240 @@ export interface ToolCall {
   duration_ms: number;
   created_at: string;
 }
+
+export type AgentRole = 'ceo' | 'cmo' | 'cto' | 'cfo' | 'cso' | 'cro';
+export type TaskStatus = 'queued' | 'running' | 'done' | 'failed';
+export type MemoryType = 'decision' | 'output' | 'fact' | 'preference' | 'learning';
+
+export interface StartupAgent {
+  id: string;
+  project_id: string;
+  role: AgentRole;
+  name: string;
+  model: string;
+  is_active: boolean;
+  last_run_at: string | null;
+  tasks_completed: number;
+  created_at: string;
+}
+
+export interface AgentTask {
+  id: string;
+  agent_id: string;
+  project_id: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  output: string | null;
+  tools_used: string[];
+  triggered_by: 'user' | 'agent' | 'schedule';
+  triggered_by_agent_id: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  judge_score?: number | null;
+  judge_feedback?: string | null;
+  judge_passed?: boolean | null;
+  revision_round?: number;
+  revision_of_task_id?: string | null;
+  final_status?: 'done' | 'done_with_warnings' | 'failed_quality';
+  created_at: string;
+}
+
+export interface AgentMemory {
+  id: string;
+  agent_id: string;
+  project_id: string;
+  memory_type: MemoryType;
+  content: string;
+  source_task_id: string | null;
+  created_at: string;
+}
+
+export interface AgentMessage {
+  id: string;
+  from_agent_id: string;
+  to_agent_id: string;
+  project_id: string;
+  subject: string;
+  content: string;
+  read: boolean;
+  reply_task_id: string | null;
+  created_at: string;
+}
+
+export interface StartupContext {
+  companyName: string;
+  product: string;
+  targetMarket: string;
+  stage: 'idea' | 'mvp' | 'early-revenue' | 'growth';
+  problem: string;
+}
+
+export interface JudgeEvaluation {
+  id: string;
+  task_id: string;
+  agent_id: string;
+  project_id: string;
+  round: number;
+  score_complete: number;
+  score_accurate: number;
+  score_actionable: number;
+  score_role: number;
+  score_quality: number;
+  total_score: number;
+  passed: boolean;
+  feedback: string;
+  revision_prompt: string | null;
+  created_at: string;
+}
+
+export interface AutonomousRun {
+  id: string;
+  project_id: string;
+  week_start: string;
+  triggered_by: 'schedule' | 'user';
+  total_tasks: number;
+  completed_tasks: number;
+  emails_sent: number;
+  posts_created: number;
+  leads_found: number;
+  status: 'running' | 'done' | 'partial';
+  summary: string | null;
+  created_at: string;
+}
+
+export interface PendingApproval {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  task_id: string;
+  action_type: 'send_email' | 'post_content' | 'create_file' | 'api_call';
+  action_data: Record<string, unknown>;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  decided_at: string | null;
+}
+
+export interface OutreachLead {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  company_name: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  company_url: string | null;
+  company_size: string | null;
+  industry: string | null;
+  research_notes: string | null;
+  email_subject: string | null;
+  email_body: string | null;
+  email_sent: boolean;
+  email_sent_at: string | null;
+  reply_received: boolean;
+  status: 'found' | 'researched' | 'drafted' | 'sent' | 'replied' | 'converted';
+  created_at: string;
+}
+
+export interface AgentAnalytics {
+  id?: string;
+  agent_id: string;
+  project_id: string;
+  week_start: string;
+  tasks_completed: number;
+  tasks_failed: number;
+  avg_judge_score: number;
+  avg_revision_rounds: number;
+  emails_sent: number;
+  memories_created: number;
+  created_at?: string;
+}
+
+export type AutonomousLevel = 'supervised' | 'semi-auto' | 'full-auto';
+
+export interface WebhookConfig {
+  id: string;
+  project_id: string;
+  direction: 'inbound' | 'outbound';
+  source?: 'stripe' | 'github' | 'custom' | null;
+  url?: string | null;
+  events?: string[] | null;
+  secret: string;
+  agent_role?: string | null;
+  task_prefix?: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface BrowserSession {
+  id: string;
+  project_id: string;
+  agent_id: string | null;
+  canvas_id: string | null;
+  session_id: string;
+  live_view_url: string;
+  current_url?: string | null;
+  status: 'active' | 'completed' | 'error';
+  scraper_type: string;
+  query: string;
+  rows_extracted: number;
+  created_at: string;
+}
+
+export interface ScraperConfig {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  queryPlaceholder: string;
+  columns: ColumnSchema[];
+  maxResults: number;
+}
+
+export type WatchPlatform = 'amazon' | 'flipkart' | 'meesho' | 'custom';
+export type WatchStatus = 'watching' | 'triggered' | 'paused' | 'expired';
+
+export interface PriceWatch {
+  id: string;
+  user_id: string;
+  project_id: string | null;
+  product_name: string;
+  product_url: string;
+  platform: WatchPlatform;
+  target_price: number;
+  current_price: number | null;
+  original_price: number | null;
+  lowest_price: number | null;
+  currency: string;
+  check_interval: number;
+  alert_email: string | null;
+  alert_whatsapp: string | null;
+  image_url: string | null;
+  status: WatchStatus;
+  triggered_at: string | null;
+  last_checked_at: string | null;
+  created_at: string;
+}
+
+export interface PriceHistory {
+  id: string;
+  watch_id: string;
+  price: number;
+  in_stock: boolean;
+  deal_score: number;
+  scraped_at: string;
+}
+
+export interface PriceAlertSent {
+  id: string;
+  watch_id: string;
+  channel: 'email' | 'whatsapp';
+  message: string;
+  sent_at: string;
+  delivered: boolean;
+}
+
+
+
+
+
 
