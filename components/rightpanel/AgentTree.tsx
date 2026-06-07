@@ -177,6 +177,22 @@ export default function AgentTree({ agents, selectedAgentId, onSelectAgent }: Ag
     return tokens.toString();
   };
 
+  const getRichState = (agentName: string, status: Agent['status'], task?: string | null, isOrch?: boolean) => {
+    if (status === 'error') return 'failed' as const;
+    if (status === 'done') return 'completed' as const;
+    if (status === 'pending') return 'queued' as const;
+    
+    const nameLower = agentName.toLowerCase();
+    const taskLower = (task || '').toLowerCase();
+    
+    if (nameLower.includes('verdict') || taskLower.includes('verdict')) return 'generating_verdict' as const;
+    if (nameLower.includes('synthes') || taskLower.includes('synthes')) return 'synthesizing' as const;
+    if (nameLower.includes('validat') || taskLower.includes('validat') || nameLower.includes('council')) return 'validating' as const;
+    if (nameLower.includes('research') || taskLower.includes('research') || nameLower.includes('scraper')) return 'researching' as const;
+    
+    return isOrch ? ('thinking' as const) : ('analyzing' as const);
+  };
+
   return (
     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 font-dmsans py-2">
       {flattenedNodes.length === 0 ? (
@@ -189,11 +205,7 @@ export default function AgentTree({ agents, selectedAgentId, onSelectAgent }: Ag
           const isOrchestrator = node.type === 'orchestrator';
           const runtime = getAgentRuntime(node);
 
-          const neuralState = 
-            node.status === 'running' ? 'execution' as const :
-            node.status === 'done' ? 'completed' as const :
-            node.status === 'error' ? 'failed' as const :
-            isOrchestrator ? 'thinking' as const : 'idle' as const;
+          const neuralState = getRichState(node.name, node.status, node.task, isOrchestrator);
 
           return (
             <div 

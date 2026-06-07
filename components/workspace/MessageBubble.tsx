@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Copy, Check, ChevronDown, ChevronUp, Loader2, CheckCircle2, XCircle, ExternalLink, Download, Printer, ThumbsUp, ThumbsDown, Pencil, RotateCcw } from 'lucide-react';
 import NeuralSymbol from './NeuralSymbol';
+import OrchestrationTimeline from './OrchestrationTimeline';
 
 interface MessageBubbleProps {
   message: Message;
@@ -735,6 +736,32 @@ export default function MessageBubble({ message, onOpenPreview, onEditMessage, o
         <NeuralSymbol state="completed" size={14} className="shrink-0" />
         <span>3RDMIND</span>
       </div>
+      
+      {/* 4. Live Orchestration Timeline (displays as Completed for historical messages) */}
+      <OrchestrationTimeline isFinished={true} />
+
+      {/* 9. Final Synthesis Moment Card */}
+      <div className="w-full bg-[#5db872]/5 border border-[#5db872]/20 rounded-xl p-3.5 mb-4 space-y-2 select-none">
+        <div className="flex items-center gap-2 text-[#5db872] font-semibold text-[10px] font-mono uppercase tracking-wider">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          <span>Consensus Synthesized</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[9px] font-mono text-[#5E5B56]">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#5db872]">✓</span>
+            <span>Research Complete</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#5db872]">✓</span>
+            <span>Validation Complete</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#5db872]">✓</span>
+            <span>Council Verdict Reached</span>
+          </div>
+        </div>
+      </div>
+
       <div className="w-full text-ink select-text">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}

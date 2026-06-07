@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface NeuralSymbolProps {
-  state?: 'thinking' | 'execution' | 'idle' | 'completed' | 'failed';
+  state?: 'thinking' | 'execution' | 'idle' | 'completed' | 'failed' | 'queued' | 'analyzing' | 'researching' | 'validating' | 'synthesizing' | 'generating_verdict';
   size?: number;
   className?: string;
 }
@@ -21,10 +21,13 @@ export default function NeuralSymbol({
   let primaryColor = gold;
   let secondaryColor = border;
   
-  if (state === 'thinking') {
+  const isGoldState = state === 'thinking' || state === 'analyzing' || state === 'researching';
+  const isPurpleState = state === 'execution' || state === 'validating' || state === 'synthesizing' || state === 'generating_verdict';
+  
+  if (isGoldState) {
     primaryColor = gold;
     secondaryColor = 'rgba(229, 154, 90, 0.25)';
-  } else if (state === 'execution') {
+  } else if (isPurpleState) {
     primaryColor = purple;
     secondaryColor = 'rgba(123, 97, 255, 0.25)';
   } else if (state === 'completed') {
@@ -34,12 +37,24 @@ export default function NeuralSymbol({
     primaryColor = '#c64545'; // Error red
     secondaryColor = 'rgba(198, 69, 69, 0.2)';
   } else {
-    // idle
+    // idle / queued
     primaryColor = '#8e8b82'; // muted soft
     secondaryColor = '#e6dfd8';
   }
 
-  // Pure SVG/CSS animations for premium micro-interactions and smooth performance
+  // Dynamic animation attributes based on the 8 states
+  let orbitAnimation = 'none';
+  if (state === 'thinking' || state === 'analyzing') orbitAnimation = 'orbit-rotate-symbol 14s linear infinite';
+  else if (state === 'researching') orbitAnimation = 'orbit-rotate-symbol 6s linear infinite';
+  else if (isPurpleState) orbitAnimation = 'orbit-rotate-symbol 8s linear infinite';
+
+  let innerAnimation = 'pulse-glow-symbol 2.5s ease-in-out infinite';
+  if (state === 'validating') innerAnimation = 'pulse-glow-symbol 1.2s ease-in-out infinite'; // fast validation double pulse
+  else if (state === 'generating_verdict') innerAnimation = 'pulse-glow-symbol 1.8s ease-in-out infinite';
+  else if (state === 'completed' || state === 'failed' || state === 'idle' || state === 'queued') innerAnimation = 'none';
+
+  const isAnimatedTrack = isGoldState || isPurpleState;
+
   return (
     <svg
       width={size}
@@ -60,22 +75,22 @@ export default function NeuralSymbol({
         @keyframes dash-symbol {
           to { stroke-dashoffset: -40; }
         }
-        .symbol-orbit {
+        .symbol-orbit-path {
           transform-origin: center;
-          animation: orbit-rotate-symbol ${state === 'thinking' ? '14s' : state === 'execution' ? '8s' : '0s'} linear infinite;
+          animation: ${orbitAnimation};
         }
-        .symbol-inner {
+        .symbol-inner-core {
           transform-origin: center;
-          animation: pulse-glow-symbol 2.5s ease-in-out infinite;
+          animation: ${innerAnimation};
         }
-        .symbol-dash {
+        .symbol-dash-path {
           stroke-dasharray: 8 4;
           animation: dash-symbol 4s linear infinite;
         }
       `}</style>
       
       {/* Outer Glow Halo */}
-      {(state === 'thinking' || state === 'execution') && (
+      {isAnimatedTrack && (
         <circle
           cx="50"
           cy="50"
@@ -99,7 +114,7 @@ export default function NeuralSymbol({
       />
 
       {/* Orbital paths and nodes */}
-      <g className="symbol-orbit">
+      <g className="symbol-orbit-path">
         {/* Orbital Track */}
         <circle
           cx="50"
@@ -108,8 +123,8 @@ export default function NeuralSymbol({
           fill="none"
           stroke={primaryColor}
           strokeWidth="1"
-          opacity={state === 'idle' ? '0.1' : '0.25'}
-          className={state === 'thinking' || state === 'execution' ? 'symbol-dash' : ''}
+          opacity={state === 'idle' || state === 'queued' ? '0.1' : '0.25'}
+          className={isAnimatedTrack ? 'symbol-dash-path' : ''}
         />
         
         {/* Outer orbital nodes */}
@@ -120,7 +135,7 @@ export default function NeuralSymbol({
       </g>
 
       {/* Inner Central Mind Node Network */}
-      <g className="symbol-inner">
+      <g className="symbol-inner-core">
         {/* Connections */}
         <line x1="50" y1="50" x2="35" y2="35" stroke={primaryColor} strokeWidth="1.5" opacity="0.6" />
         <line x1="50" y1="50" x2="65" y2="35" stroke={primaryColor} strokeWidth="1.5" opacity="0.6" />
