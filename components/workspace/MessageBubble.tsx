@@ -14,6 +14,7 @@ interface MessageBubbleProps {
   onOpenPreview?: (code: string, title: string) => void;
   onEditMessage?: (messageId: string, newContent: string) => void;
   onRegenerateMessage?: (messageId: string) => void;
+  goal?: string;
 }
 
 interface ToolCallData {
@@ -550,7 +551,7 @@ function CodeBlock({ language, code, onOpenPreview }: { language: string; code: 
 
 import ToolCallBlock from './ToolCallBlock';
 
-export default function MessageBubble({ message, onOpenPreview, onEditMessage, onRegenerateMessage }: MessageBubbleProps) {
+export default function MessageBubble({ message, onOpenPreview, onEditMessage, onRegenerateMessage, goal }: MessageBubbleProps) {
   const { role, content } = message;
   const [toolCalls, setToolCalls] = React.useState<any[]>([]);
   const [isEditing, setIsEditing] = useState(false);
@@ -738,7 +739,7 @@ export default function MessageBubble({ message, onOpenPreview, onEditMessage, o
       </div>
       
       {/* 4. Live Orchestration Timeline (displays as Completed for historical messages) */}
-      <OrchestrationTimeline isFinished={true} />
+      <OrchestrationTimeline isFinished={true} goal={goal} />
 
       {/* 9. Final Synthesis Moment Card */}
       <div className="w-full bg-[#5db872]/5 border border-[#5db872]/20 rounded-xl p-3.5 mb-4 space-y-2 select-none">

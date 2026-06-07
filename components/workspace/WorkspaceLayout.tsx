@@ -900,6 +900,7 @@ export default function WorkspaceLayout({
               setCouncilConfig={setCouncilConfig}
               onToggleToolsPanel={handleToggleToolsPanel}
               isToolsPanelActive={isRightPanelOpen && activeRightTab === 'tools'}
+              goal={project.goal}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-sm text-[#8A8780] italic">

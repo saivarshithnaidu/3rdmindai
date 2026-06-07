@@ -748,25 +748,84 @@ export default function RightPanel({
 
         {activeTab === 'agents' && (
           <div id="workspace-agents-section" className="space-y-4 animate-fadeIn flex flex-col">
-            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-2 select-text">
-              <div className="flex items-center justify-between">
+            {/* AI Mission Control Dashboard */}
+            <div className="bg-[#FFFFFF] border border-[#E5E0DA] rounded-xl p-4 shadow-xs space-y-3 select-text">
+              <div className="flex items-center justify-between border-b border-[#F4F0EB] pb-2">
                 <div className="flex items-center gap-2">
-                  <NeuralSymbol 
-                    state={agents.some(a => a.status === 'running') ? 'execution' : 'thinking'} 
-                    size={16} 
-                    className="shrink-0" 
-                  />
-                  <span className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">
-                    MIND NETWORK
-                  </span>
+                  <Brain className="w-4 h-4 text-[#7B61FF]" />
+                  <div>
+                    <h3 className="text-xs font-bold text-[#191919] uppercase tracking-wider font-lora">Positioning & GTM Council</h3>
+                    <p className="text-[8px] text-[#8e8b82] font-mono uppercase tracking-wide leading-none mt-0.5">
+                      {agents.some(a => a.status === 'running') ? 'Deliberation: Resolving GTM criteria' : 'Verdict Engine: Verdict Reached'}
+                    </p>
+                  </div>
                 </div>
-                <span className="text-[9px] bg-[#cc785c]/10 text-[#cc785c] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider select-none">
-                  Mission Control
+                <span className="text-[9px] bg-purple-50 text-[#7B61FF] border border-purple-100 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
+                  {agents.some(a => a.status === 'running') ? 'Active Debate' : 'Consensus Set'}
                 </span>
               </div>
-              <p className="text-[11px] text-[#5E5B56] leading-relaxed">
-                Observe specialized minds collaborating on your goal. Watch tool execution and token metrics in real-time.
-              </p>
+
+              {/* Metrics Grid */}
+              <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="bg-[#FBF9F6] border border-[#E5E0DA] p-2 rounded-lg flex flex-col justify-between">
+                  <span className="text-[8px] text-[#8e8b82] uppercase font-bold tracking-wider leading-none">Confidence Score</span>
+                  <span className="text-xs font-bold text-[#cc785c] mt-1">94% (High Integrity)</span>
+                </div>
+                
+                <div className="bg-[#FBF9F6] border border-[#E5E0DA] p-2 rounded-lg flex flex-col justify-between">
+                  <span className="text-[8px] text-[#8e8b82] uppercase font-bold tracking-wider leading-none">Evidence Citations</span>
+                  <span className="text-xs font-bold text-[#191919] mt-1">14 Sources Verified</span>
+                </div>
+
+                <div className="bg-[#FBF9F6] border border-[#E5E0DA] p-2 rounded-lg col-span-2 space-y-1">
+                  <div className="flex justify-between items-center text-[8px] text-[#8e8b82] uppercase font-bold tracking-wider leading-none">
+                    <span>Consensus Progress</span>
+                    <span className="text-[#7B61FF]">{agents.some(a => a.status === 'running') ? '82%' : '100%'}</span>
+                  </div>
+                  <div className="w-full bg-[#E5E0DA] h-1.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        agents.some(a => a.status === 'running') ? 'bg-[#7B61FF] w-[82%]' : 'bg-[#5db872] w-full'
+                      }`} 
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Compact SVG Relationship Graph */}
+              <div className="border border-[#F4F0EB] bg-[#FBF9F6]/50 rounded-xl p-2.5 select-none relative">
+                <span className="text-[8px] font-bold text-[#8e8b82] uppercase tracking-wider block mb-2 font-mono">
+                  Intelligence Relationship Graph
+                </span>
+                <div className="flex items-center justify-between relative px-2 py-1">
+                  <svg className="absolute inset-0 w-full h-full pointer-events-none z-0">
+                    <line x1="25" y1="18" x2="80" y2="18" stroke="#E9E2D9" strokeWidth="1" />
+                    
+                    <path d="M 105 18 L 130 8" fill="none" stroke="#E9E2D9" strokeWidth="1" />
+                    <path d="M 105 18 L 130 18" fill="none" stroke="#cc785c" strokeWidth="1" />
+                    <path d="M 105 18 L 130 28" fill="none" stroke="#E9E2D9" strokeWidth="1" />
+
+                    <path d="M 175 8 L 200 18" fill="none" stroke="#E9E2D9" strokeWidth="1" />
+                    <path d="M 175 18 L 200 18" fill="none" stroke="#cc785c" strokeWidth="1" />
+                    <path d="M 175 28 L 200 18" fill="none" stroke="#E9E2D9" strokeWidth="1" />
+                  </svg>
+                  
+                  <div className="flex flex-col items-center z-10 bg-[#FBF9F6] px-1">
+                    <div className="w-5 h-5 rounded-full border border-[#cc785c] bg-white flex items-center justify-center text-[7px] font-bold text-[#cc785c]">RM</div>
+                    <span className="text-[6.5px] font-mono font-bold text-[#8e8b82] mt-0.5">Root</span>
+                  </div>
+
+                  <div className="flex flex-col items-center z-10 bg-[#FBF9F6] px-1">
+                    <div className="w-5 h-5 rounded-full border border-[#8e8b82] bg-white flex items-center justify-center text-[7px] font-bold text-[#8e8b82]">SM</div>
+                    <span className="text-[6.5px] font-mono font-bold text-[#8e8b82] mt-0.5">Specialist</span>
+                  </div>
+
+                  <div className="flex flex-col items-center z-10 bg-[#FBF9F6] px-1">
+                    <div className="w-5 h-5 rounded-full border border-[#7B61FF] bg-white flex items-center justify-center text-[7px] font-bold text-[#7B61FF]">VE</div>
+                    <span className="text-[6.5px] font-mono font-bold text-[#7B61FF] mt-0.5">Verdict</span>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <AgentTree

@@ -25,6 +25,9 @@ interface OrchestratorChatProps {
   activeArtifactId?: string | null;
   onOpenBrowserPicker?: () => void;
 
+  // Goal context for orchestration
+  goal?: string;
+
   // Props for tools & connectors panel integration
   councilMode: boolean;
   setCouncilMode: (val: boolean) => void;
@@ -72,7 +75,8 @@ export default function OrchestratorChat({
   councilConfig,
   setCouncilConfig,
   onToggleToolsPanel,
-  isToolsPanelActive
+  isToolsPanelActive,
+  goal
 }: OrchestratorChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -92,6 +96,7 @@ export default function OrchestratorChat({
               onOpenPreview={onOpenPreview}
               onEditMessage={onEditMessage}
               onRegenerateMessage={onRegenerateMessage}
+              goal={goal}
             />
           ))}
           {isLoading && (
@@ -102,7 +107,7 @@ export default function OrchestratorChat({
               </div>
               
               {/* 4. Live Orchestration Timeline */}
-              <OrchestrationTimeline agents={agents} isFinished={false} />
+              <OrchestrationTimeline agents={agents} isFinished={false} goal={goal} />
 
               <div className="w-full max-w-[550px] bg-[#FFFFFF] border border-[#E5E0DA] rounded-2xl rounded-tl-sm p-5 space-y-4 shadow-sm">
                 <div className="border-b border-[#E5E0DA] pb-2">

@@ -193,6 +193,29 @@ export default function AgentTree({ agents, selectedAgentId, onSelectAgent }: Ag
     return isOrch ? ('thinking' as const) : ('analyzing' as const);
   };
 
+  const getDebateStatus = (node: Agent) => {
+    if (node.status !== 'running') return 'Analyzing objective...';
+    const nameLower = node.name.toLowerCase();
+    const roleLower = node.role.toLowerCase();
+    
+    if (nameLower.includes('research') || roleLower.includes('research')) {
+      return 'Scraping competitor pricing and feature sets...';
+    }
+    if (nameLower.includes('strategy') || roleLower.includes('strategy')) {
+      return 'Challenging pricing tier assumptions...';
+    }
+    if (nameLower.includes('finance') || roleLower.includes('finance')) {
+      return 'Validating LTV:CAC and margin viability...';
+    }
+    if (nameLower.includes('legal') || roleLower.includes('legal') || nameLower.includes('council')) {
+      return 'Reviewing bar compliance regulations...';
+    }
+    if (nameLower.includes('verdict') || roleLower.includes('verdict')) {
+      return 'Arbiter resolving analytical conflicts...';
+    }
+    return 'Analyzing objective inputs...';
+  };
+
   return (
     <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 font-dmsans py-2">
       {flattenedNodes.length === 0 ? (
@@ -272,11 +295,16 @@ export default function AgentTree({ agents, selectedAgentId, onSelectAgent }: Ag
 
                   {/* Progress details */}
                   {node.status === 'running' && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="w-24 bg-[#E9E2D9] h-1 rounded-full overflow-hidden">
-                        <div className="bg-[#7B61FF] h-full rounded-full animate-pulse" style={{ width: '78%' }} />
+                    <div className="mt-2 space-y-1.5">
+                      <div className="text-[9px] font-mono text-[#7B61FF] bg-[#7B61FF]/5 border border-[#7B61FF]/10 p-1.5 rounded-md leading-relaxed select-text animate-pulse">
+                        💬 {getDebateStatus(node)}
                       </div>
-                      <span className="text-[9px] font-mono text-[#7B61FF]">78%</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 bg-[#E9E2D9] h-1 rounded-full overflow-hidden">
+                          <div className="bg-[#7B61FF] h-full rounded-full animate-pulse" style={{ width: '78%' }} />
+                        </div>
+                        <span className="text-[9px] font-mono text-[#7B61FF]">78%</span>
+                      </div>
                     </div>
                   )}
 
