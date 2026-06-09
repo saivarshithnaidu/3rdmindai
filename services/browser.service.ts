@@ -1,6 +1,8 @@
 import Browserbase from '@browserbasehq/sdk';
 import { chromium, Browser } from 'playwright';
 import supabaseService from './supabase.service';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 const apiKey = process.env.BROWSERBASE_API_KEY;
 const projectId = process.env.BROWSERBASE_PROJECT_ID;
@@ -47,6 +49,10 @@ export const browserService = {
     if (error) {
       throw new Error(`Failed to save browser session to database: ${error.message}`);
     }
+
+    emit(projectIdParam, StreamEventType.BROWSER_OPENING,
+      'Opening browser...',
+      { detail: `Scraper: ${scraperType}` });
 
     return {
       sessionId,
@@ -104,6 +110,23 @@ export const browserService = {
         rows_extracted: rowCount
       })
       .eq('id', dbId);
+
+    try {
+      const { data: session } = await supabase
+        .from('browser_sessions')
+        .select('project_id, agent_id')
+        .eq('id', dbId)
+        .maybeSingle();
+
+      if (session) {
+        emit(session.project_id, StreamEventType.BROWSER_CLOSED,
+          'Browser closed',
+          {
+            agentId: session.agent_id || undefined,
+            status: 'done'
+          });
+      }
+    } catch {}
   },
 
   async updateCurrentUrlByCanvas(canvasId: string, url: string): Promise<void> {

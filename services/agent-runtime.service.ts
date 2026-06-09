@@ -6,6 +6,8 @@ import agentMemoryService from './agent-memory.service';
 import agentCommsService from './agent-comms.service';
 import { AGENT_IDENTITIES } from '../lib/agent-identities';
 import { StartupAgent, AgentTask, AgentRole, TaskStatus } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 export const agentRuntimeService = {
   async deployStartupTeam(
@@ -190,6 +192,15 @@ export const agentRuntimeService = {
       .eq('id', task.id);
 
     try {
+      emit(agent.project_id, StreamEventType.AGENT_STARTED,
+        `${agent.name} working...`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          detail: taskDescription
+        });
+
       const isCSO = agent.role === 'cso';
       const isOutreachIntent = /lead|outreach|prospect/i.test(taskDescription);
 
@@ -246,6 +257,33 @@ export const agentRuntimeService = {
 
       const availableTools = await mcpService.getAvailableTools(userId, agent.project_id);
       
+      let competitorIntelStr = '';
+      if (agent.role === 'cmo' || agent.role === 'cro') {
+        try {
+          const { data: latestReports } = await supabase
+            .from('ad_intelligence_reports')
+            .select('*, competitor:competitor_profiles(*)')
+            .eq('project_id', agent.project_id)
+            .order('generated_at', { ascending: false })
+            .limit(1);
+
+          if (latestReports && latestReports.length > 0) {
+            const latestReport = latestReports[0];
+            const compName = latestReport.competitor?.competitor_name || 'Competitor';
+            const topAngle = latestReport.top_angles?.[0]?.angle || 'N/A';
+            const topCta = latestReport.top_ctas?.[0]?.cta || 'N/A';
+            
+            if (agent.role === 'cmo') {
+              competitorIntelStr = `\n\n[COMPETITIVE AD INTELLIGENCE]\nWe tracked competitive ad campaigns for ${compName}.\n- Total Ads Found: ${latestReport.total_ads_found}\n- Active Ads: ${latestReport.active_ads}\n- Primary Marketing Angle: ${topAngle}\n- Top CTA: ${topCta}\n- Insights:\n${latestReport.insights}\n`;
+            } else if (agent.role === 'cro' && /competitor|research|benchmark|ad/i.test(taskDescription)) {
+              competitorIntelStr = `\n\n[COMPETITIVE AD BENCHMARK]\nCompetitor: ${compName}\n- Active Ads count: ${latestReport.active_ads}\n- Top CTAs: ${JSON.stringify(latestReport.top_ctas)}\n- Top Formats: ${JSON.stringify(latestReport.top_formats)}\n`;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to inject competitive ad intelligence:', err);
+        }
+      }
+
       const fullSystemPrompt = `[IDENTITY]
 ${systemPrompt}
 
@@ -259,7 +297,8 @@ ${tasksStr}
 ${unreadMessages}
 
 [AVAILABLE TOOLS]
-${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.description}`).join('\n') : 'No tools active.'}`;
+${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.description}`).join('\n') : 'No tools active.'}
+${competitorIntelStr}`;
 
       // Check for browser agent / web scraping intent auto-trigger
       try {
@@ -351,8 +390,27 @@ ${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.de
         console.error('Failed to trigger task webhook in success path:', webhookErr);
       }
 
+      emit(agent.project_id, StreamEventType.AGENT_COMPLETE,
+        `${agent.name} completed`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          status: 'done',
+          detail: finalTask.output ? finalTask.output.substring(0, 150) : ''
+        });
+
       return finalTask;
     } catch (err: any) {
+      emit(agent.project_id, StreamEventType.AGENT_FAILED,
+        `${agent.name} failed`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          status: 'error',
+          detail: err.message || String(err)
+        });
       console.error(`Task ${task.id} execution failed:`, err);
       
       // Update task status to failed
@@ -430,6 +488,15 @@ ${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.de
         roundOutput += text;
         fullOutput += text;
         await throttledSaveOutput(fullOutput);
+
+        emit(agent.project_id, StreamEventType.AGENT_OUTPUT_CHUNK,
+          `${agent.name} writing...`,
+          {
+            agentId: agent.id,
+            agentName: agent.name,
+            agentRole: agent.role,
+            data: { chunk: text.substring(0, 100) }
+          });
       }
 
       // Check for tool calls
@@ -899,6 +966,15 @@ Opening angles used: Focused on scaling bottlenecks and operational workflows.`;
       .eq('id', task.id);
 
     try {
+      emit(agent.project_id, StreamEventType.AGENT_STARTED,
+        `${agent.name} working...`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          detail: taskDescription
+        });
+
       const isCSO = agent.role === 'cso';
       const isOutreachIntent = /lead|outreach|prospect/i.test(taskDescription);
 
@@ -953,6 +1029,33 @@ Opening angles used: Focused on scaling bottlenecks and operational workflows.`;
 
       const availableTools = await mcpService.getAvailableTools(userId, agent.project_id);
       
+      let competitorIntelStr = '';
+      if (agent.role === 'cmo' || agent.role === 'cro') {
+        try {
+          const { data: latestReports } = await supabase
+            .from('ad_intelligence_reports')
+            .select('*, competitor:competitor_profiles(*)')
+            .eq('project_id', agent.project_id)
+            .order('generated_at', { ascending: false })
+            .limit(1);
+
+          if (latestReports && latestReports.length > 0) {
+            const latestReport = latestReports[0];
+            const compName = latestReport.competitor?.competitor_name || 'Competitor';
+            const topAngle = latestReport.top_angles?.[0]?.angle || 'N/A';
+            const topCta = latestReport.top_ctas?.[0]?.cta || 'N/A';
+            
+            if (agent.role === 'cmo') {
+              competitorIntelStr = `\n\n[COMPETITIVE AD INTELLIGENCE]\nWe tracked competitive ad campaigns for ${compName}.\n- Total Ads Found: ${latestReport.total_ads_found}\n- Active Ads: ${latestReport.active_ads}\n- Primary Marketing Angle: ${topAngle}\n- Top CTA: ${topCta}\n- Insights:\n${latestReport.insights}\n`;
+            } else if (agent.role === 'cro' && /competitor|research|benchmark|ad/i.test(taskDescription)) {
+              competitorIntelStr = `\n\n[COMPETITIVE AD BENCHMARK]\nCompetitor: ${compName}\n- Active Ads count: ${latestReport.active_ads}\n- Top CTAs: ${JSON.stringify(latestReport.top_ctas)}\n- Top Formats: ${JSON.stringify(latestReport.top_formats)}\n`;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to inject competitive ad intelligence:', err);
+        }
+      }
+
       const fullSystemPrompt = `[IDENTITY]
 ${systemPrompt}
 
@@ -966,7 +1069,8 @@ ${tasksStr}
 ${unreadMessages}
 
 [AVAILABLE TOOLS]
-${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.description}`).join('\n') : 'No tools active.'}`;
+${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.description}`).join('\n') : 'No tools active.'}
+${competitorIntelStr}`;
 
       // Check for browser agent / web scraping intent auto-trigger (for background run)
       try {
@@ -1022,6 +1126,49 @@ ${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.de
 
       await agentMemoryService.saveTaskMemories(finalTask, agentId, agent.project_id);
 
+      // Auto-create Board Resolution from major decisions
+      try {
+        if (finalTask.status === 'done' && finalTask.output) {
+          const lowerOutput = finalTask.output.toLowerCase();
+          const isResolutionCandidate = 
+            lowerOutput.includes('pricing') || 
+            lowerOutput.includes('strategy') || 
+            lowerOutput.includes('hiring') || 
+            lowerOutput.includes('product') || 
+            lowerOutput.includes('resolution') || 
+            lowerOutput.includes('decide') || 
+            lowerOutput.includes('approve');
+
+          if (isResolutionCandidate) {
+            const systemRes = `You are a corporate secretary. Analyze the following executive output. 
+            If a major decision was proposed or decided (e.g. pricing change, product roadmap, hiring action, marketing strategy shift, financial budget), formulate it as a formal Board Resolution.
+            If no major decision was made, return empty string.
+            Otherwise, return a JSON block:
+            {"title": "Resolution Title", "resolution": "Formal resolution text..."}`;
+
+            const response = await openrouterService.callModel(systemRes, [{ role: 'user', content: finalTask.output }], 'deepseek/deepseek-chat');
+            const cleaned = response.replace(/```json/gi, '').replace(/```/g, '').trim();
+            if (cleaned) {
+              const resData = JSON.parse(cleaned);
+              if (resData.title && resData.resolution) {
+                await supabase
+                  .from('board_resolutions')
+                  .insert({
+                    project_id: agent.project_id,
+                    title: resData.title,
+                    resolution: resData.resolution,
+                    proposed_by: agent.role,
+                    approved_by: [agent.role],
+                    status: 'proposed'
+                  });
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to auto-create board resolution:', err);
+      }
+
       const { data: allAgents } = await supabase
         .from('startup_agents')
         .select('*')
@@ -1051,8 +1198,27 @@ ${availableTools.length > 0 ? availableTools.map((t) => `- **${t.name}**: ${t.de
         console.error('Failed to trigger task webhook in success path:', webhookErr);
       }
 
+      emit(agent.project_id, StreamEventType.AGENT_COMPLETE,
+        `${agent.name} completed`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          status: 'done',
+          detail: finalTask.output ? finalTask.output.substring(0, 150) : ''
+        });
+
       return finalTask;
     } catch (err: any) {
+      emit(agent.project_id, StreamEventType.AGENT_FAILED,
+        `${agent.name} failed`,
+        {
+          agentId: agent.id,
+          agentName: agent.name,
+          agentRole: agent.role,
+          status: 'error',
+          detail: err.message || String(err)
+        });
       console.error(`Task ${task.id} execution failed:`, err);
       
       const { data: failedTask } = await supabase

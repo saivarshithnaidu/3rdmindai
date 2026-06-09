@@ -2,6 +2,8 @@ import supabaseService from './supabase.service';
 import openrouterService from './openrouter.service';
 import { JUDGE_IDENTITY } from '../lib/agent-identities';
 import { AgentTask, StartupAgent, JudgeEvaluation } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 export const judgeService = {
   async evaluateTask(
@@ -10,6 +12,10 @@ export const judgeService = {
     projectId: string
   ): Promise<any> {
     const supabase = supabaseService.getServiceClient();
+    
+    emit(projectId, StreamEventType.JUDGE_EVALUATING,
+      `Judge evaluating ${agent.name} output...`,
+      { agentId: agent.id });
     
     // User prompt
     const userPrompt = `Agent role: ${agent.role}
@@ -128,6 +134,24 @@ Evaluate this output now.`;
       console.error('Failed to update task with judge evaluation details:', updateErr);
     }
 
+    if (result.passed) {
+      emit(projectId, StreamEventType.JUDGE_PASSED,
+        `${agent.name} quality passed: ${result.total}/50`,
+        {
+          agentId: agent.id,
+          status: 'done',
+          data: { score: result.total, passed: true }
+        });
+    } else {
+      emit(projectId, StreamEventType.JUDGE_FAILED,
+        `${agent.name} needs revision: ${result.total}/50`,
+        {
+          agentId: agent.id,
+          status: 'error',
+          data: { score: result.total, passed: false, feedback: result.feedback }
+        });
+    }
+
     return result;
   },
 
@@ -145,6 +169,13 @@ Evaluate this output now.`;
 
     const currentRound = originalTask.revision_round ?? 0;
     const supabase = supabaseService.getServiceClient();
+
+    emit(projectId, StreamEventType.JUDGE_REVISION,
+      `Revising ${agent.name} output (round ${currentRound + 1})`,
+      {
+        agentId: agent.id,
+        detail: (evaluation.revision_prompt || '').substring(0, 100)
+      });
 
     if (currentRound >= 3) {
       // Mark as done_with_warnings if max rounds reached

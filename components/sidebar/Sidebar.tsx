@@ -6,6 +6,7 @@ import { Project } from '../../types';
 import NavItem from './NavItem';
 import ProjectList from './ProjectList';
 import { motion } from 'framer-motion';
+import { useStream } from '../../hooks/useStream';
 import { 
   Plus, 
   Search, 
@@ -41,6 +42,38 @@ export default function Sidebar({
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [connectedCount, setConnectedCount] = useState(0);
+
+  const { events } = useStream(activeProjectId);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(Date.now());
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const recentEvents = events.filter((e) => {
+    const diff = now - new Date(e.timestamp).getTime();
+    return diff >= -5000 && diff < 30000;
+  });
+
+  const activeAgents = new Set(
+    recentEvents
+      .filter((e) => e.agentId || e.agentName)
+      .map((e) => e.agentId || e.agentName)
+  );
+  
+  const activeCount = activeAgents.size || (recentEvents.length > 0 ? 1 : 0);
+  const isWorking = recentEvents.length > 0;
+
+  useEffect(() => {
+    if (isWorking && activeCount > 0) {
+      document.title = `⚡ 3RDMIND — ${activeCount} agents running`;
+    } else {
+      document.title = '3RDMIND';
+    }
+  }, [isWorking, activeCount]);
 
   useEffect(() => {
     fetch('/api/connectors/list?userId=00000000-0000-0000-0000-000000000000')
@@ -204,22 +237,61 @@ export default function Sidebar({
           ) : null}
         />
         <NavItem 
-          label="Team" 
-          icon={<i className="ti ti-users text-sm" />} 
-          active={activeNavItem === 'Team'}
+          label="Board" 
+          icon={<i className="ti ti-building-bank text-sm" />} 
+          active={activeNavItem === 'Board'}
           onClick={() => {
             if (activeProjectId) {
-              router.push(`/startup/${activeProjectId}`);
+              router.push(`/board?projectId=${activeProjectId}`);
             } else {
-              router.push('/workspace');
+              router.push('/board');
             }
-            if (onNavClick) onNavClick('Team');
+            if (onNavClick) onNavClick('Board');
           }}
           badge={(
             <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
               6
             </span>
           )}
+        />
+        <NavItem 
+          label="Due Diligence" 
+          icon={<i className="ti ti-report-search text-sm" />} 
+          active={activeNavItem === 'Due Diligence'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/due-diligence?projectId=${activeProjectId}`);
+            } else {
+              router.push('/due-diligence');
+            }
+            if (onNavClick) onNavClick('Due Diligence');
+          }}
+        />
+        <NavItem 
+          label="Hiring" 
+          icon={<i className="ti ti-users-group text-sm" />} 
+          active={activeNavItem === 'Hiring'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/hiring?projectId=${activeProjectId}`);
+            } else {
+              router.push('/hiring');
+            }
+            if (onNavClick) onNavClick('Hiring');
+          }}
+        />
+        <NavItem 
+          label="Reputation" 
+          icon={<i className="ti ti-social text-sm" />} 
+          active={activeNavItem === 'Reputation'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/reputation?projectId=${activeProjectId}`);
+            } else {
+              router.push('/reputation');
+            }
+            if (onNavClick) onNavClick('Reputation');
+          }}
         />
         <NavItem 
           label="Price Watch" 
@@ -234,7 +306,114 @@ export default function Sidebar({
             if (onNavClick) onNavClick('Price Watch');
           }}
         />
+        <NavItem 
+          label="Ad Intel" 
+          icon={<i className="ti ti-ad-2 text-sm" />} 
+          active={activeNavItem === 'Ad Intel'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/ad-intel?projectId=${activeProjectId}`);
+            } else {
+              router.push('/ad-intel');
+            }
+            if (onNavClick) onNavClick('Ad Intel');
+          }}
+        />
+        <NavItem 
+          label="Contracts" 
+          icon={<i className="ti ti-file-certificate text-sm" />} 
+          active={activeNavItem === 'Contracts'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/contracts?projectId=${activeProjectId}`);
+            } else {
+              router.push('/contracts');
+            }
+            if (onNavClick) onNavClick('Contracts');
+          }}
+        />
+        <NavItem 
+          label="Funding Finder" 
+          icon={<i className="ti ti-currency-rupee text-sm" />} 
+          active={activeNavItem === 'Funding Finder'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/funding?projectId=${activeProjectId}`);
+            } else {
+              router.push('/funding');
+            }
+            if (onNavClick) onNavClick('Funding Finder');
+          }}
+        />
+        <NavItem 
+          label="Health Check" 
+          icon={<i className="ti ti-heart-rate-monitor text-sm" />} 
+          active={activeNavItem === 'Health Check'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/health?projectId=${activeProjectId}`);
+            } else {
+              router.push('/health');
+            }
+            if (onNavClick) onNavClick('Health Check');
+          }}
+        />
+        <NavItem 
+          label="Procurement" 
+          icon={<i className="ti ti-shopping-cart text-sm" />} 
+          active={activeNavItem === 'Procurement'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/procurement?projectId=${activeProjectId}`);
+            } else {
+              router.push('/procurement');
+            }
+            if (onNavClick) onNavClick('Procurement');
+          }}
+        />
+        <NavItem 
+          label="Briefings" 
+          icon={<i className="ti ti-microphone text-sm" />} 
+          active={activeNavItem === 'Briefings'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/briefing?projectId=${activeProjectId}`);
+            } else {
+              router.push('/briefing');
+            }
+            if (onNavClick) onNavClick('Briefings');
+          }}
+        />
+        <NavItem 
+          label="Gallery" 
+          icon={<i className="ti ti-photo text-sm" />} 
+          active={activeNavItem === 'Gallery'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/gallery?projectId=${activeProjectId}`);
+            } else {
+              router.push('/gallery');
+            }
+            if (onNavClick) onNavClick('Gallery');
+          }}
+        />
       </div>
+
+      {/* Global Activity Indicator */}
+      {isWorking && activeCount > 0 && (
+        <div className="px-4 py-2.5 mx-3 my-2 bg-white border border-[#E5E0DA] rounded-xl flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <span className="text-[11px] font-bold text-[#5E5B56]">Agents working...</span>
+          </div>
+          <span className="text-[10px] text-green-700 bg-green-50 border border-green-200/50 px-2 py-0.5 rounded-full font-extrabold uppercase shrink-0">
+            {activeCount} active
+          </span>
+        </div>
+      )}
 
       <div className="h-px bg-[#E5E0DA] my-1 mx-3" />
 

@@ -51,8 +51,17 @@ export default function WorkspaceLayout({
   const [selectedModel, setSelectedModel] = useState(DEFAULT_ORCHESTRATOR_MODEL);
   const [isOrchestratorLoading, setIsOrchestratorLoading] = useState(false);
   const [activeNavItem, setActiveNavItem] = useState('Chats');
-  const [activeRightTab, setActiveRightTab] = useState<'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools'>('agents');
+  const [activeRightTab, setActiveRightTab] = useState<'stream' | 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools'>('stream');
   const [activeConnectorsCount, setActiveConnectorsCount] = useState<number>(0);
+
+  // Auto-switch right tab to stream and open panel when a task starts running
+  useEffect(() => {
+    const isAnyTaskRunning = isOrchestratorLoading || agents.some(a => a.status === 'running');
+    if (isAnyTaskRunning) {
+      setActiveRightTab('stream');
+      setIsRightPanelOpen(true);
+    }
+  }, [isOrchestratorLoading, agents]);
 
   const fetchActiveConnectorsCount = useCallback(async () => {
     try {

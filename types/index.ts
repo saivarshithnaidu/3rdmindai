@@ -399,8 +399,80 @@ export interface PriceAlertSent {
   delivered: boolean;
 }
 
+export interface CompetitorProfile {
+  id: string;
+  project_id: string;
+  user_id: string;
+  competitor_url: string;
+  competitor_name: string;
+  competitor_domain: string;
+  google_ads_id: string | null;
+  meta_page_id: string | null;
+  linkedin_id: string | null;
+  last_scraped_at: string | null;
+  created_at: string;
+}
 
+export interface CompetitorAd {
+  id: string;
+  competitor_id: string;
+  platform: 'google' | 'meta' | 'linkedin' | 'tiktok';
+  ad_id: string | null;
+  headline: string | null;
+  body: string | null;
+  cta: string | null;
+  image_url: string | null;
+  video_url?: string | null;
+  landing_url: string | null;
+  start_date: string | null;
+  is_active: boolean;
+  running_days: number | null;
+  impressions_min: number | null;
+  impressions_max: number | null;
+  spend_min?: number | null;
+  spend_max?: number | null;
+  platforms_used: string[] | null;
+  raw_data: Record<string, any>;
+  scraped_at: string;
+}
 
+export interface AdVariation {
+  variation_number: number;
+  angle: string;
+  headline: string;
+  body: string;
+  cta: string;
+  why_this_works: string;
+  inspired_by: string;
+}
 
+export interface AdIntelReport {
+  id: string;
+  project_id: string;
+  competitor_id: string;
+  report_type: 'full' | 'quick' | 'update';
+  total_ads_found: number;
+  active_ads: number;
+  top_angles: { angle: string; frequency: number; example: string }[];
+  top_ctas: { cta: string; count: number }[];
+  top_formats: { format: string; count: number }[];
+  winning_ads: CompetitorAd[];
+  insights: string | null;
+  generated_at: string;
+}
 
+export interface GeneratedCampaign {
+  id: string;
+  project_id: string;
+  competitor_id: string | null;
+  report_id: string | null;
+  platform: string;
+  campaign_name: string;
+  target_audience: string;
+  ad_variations: AdVariation[];
+  strategy: string | null;
+  status: 'draft' | 'approved' | 'running';
+  created_at: string;
+}
 
+export * from '../lib/stream-events';

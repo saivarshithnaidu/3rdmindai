@@ -2,6 +2,8 @@ import { chromium } from 'playwright';
 import Browserbase from '@browserbasehq/sdk';
 import supabaseService from './supabase.service';
 import { PriceWatch, WatchPlatform } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 import { scrapeAmazon } from './scrapers/amazon.scraper';
 import { scrapeFlipkart } from './scrapers/flipkart.scraper';
 import { scrapeMeesho } from './scrapers/meesho.scraper';
@@ -168,6 +170,11 @@ export const priceWatchService = {
       return false;
     }
 
+    const projectId = watch.project_id || '00000000-0000-0000-0000-000000000000';
+    emit(projectId, StreamEventType.PRICE_CHECKING,
+      `Checking ${watch.product_name}`,
+      { detail: watch.platform });
+
     try {
       // Scrape product
       const result = await this.scrapeProduct(watch.product_url, watch.platform);
@@ -183,6 +190,17 @@ export const priceWatchService = {
       }
 
       const currentPrice = result.price;
+
+      emit(projectId, StreamEventType.PRICE_FOUND,
+        `${result.productName || watch.product_name}: ₹${currentPrice}`,
+        {
+          detail: `Target: ₹${watch.target_price}`,
+          data: {
+            currentPrice,
+            targetPrice: watch.target_price,
+            gap: currentPrice - watch.target_price
+          }
+        });
       const originalPrice = watch.original_price || result.originalPrice || currentPrice;
       const lowestPrice = watch.lowest_price === null 
         ? currentPrice 
@@ -241,6 +259,13 @@ export const priceWatchService = {
       // 3. Dispatch Alerts if target hit (Alert only once!)
       if (isTargetHit) {
         console.log(`🎯 TARGET HIT for watch ${watchId}: current ${currentPrice} <= target ${watch.target_price}`);
+        
+        emit(projectId, StreamEventType.PRICE_TARGET_HIT,
+          `🎯 Target hit! ${result.productName || watch.product_name}`,
+          {
+            status: 'done',
+            detail: `₹${currentPrice} ≤ ₹${watch.target_price}`
+          });
         
         const watchWithNewData: PriceWatch = {
           ...watch,

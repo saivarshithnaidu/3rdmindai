@@ -1,5 +1,7 @@
 import { browserService } from '../browser.service';
 import supabaseService from '../supabase.service';
+import { emit } from '../../lib/emit';
+import { StreamEventType } from '../../lib/stream-events';
 
 export async function scrapeGoogleMaps(
   page: any,
@@ -9,12 +11,33 @@ export async function scrapeGoogleMaps(
 ): Promise<number> {
   const supabase = supabaseService.getServiceClient();
 
+  let projectId = '00000000-0000-0000-0000-000000000000';
+  try {
+    const { data: canvas } = await supabase
+      .from('canvases')
+      .select('project_id')
+      .eq('id', canvasId)
+      .maybeSingle();
+    if (canvas?.project_id) {
+      projectId = canvas.project_id;
+    }
+  } catch (err) {
+    console.error('Failed to fetch project_id from canvas:', err);
+  }
+
   // Step 1 — Navigate
+  emit(projectId, StreamEventType.BROWSER_NAVIGATING,
+    'Navigating to Google Maps',
+    { detail: 'https://maps.google.com' });
+
   await page.goto('https://maps.google.com');
   await browserService.updateCurrentUrlByCanvas(canvasId, 'https://maps.google.com');
   await page.waitForLoadState('networkidle');
 
   // Step 2 — Search
+  emit(projectId, StreamEventType.BROWSER_SEARCHING,
+    `Searching Google Maps: "${query}"`);
+
   await page.fill('input#searchboxinput', query);
   await page.keyboard.press('Enter');
   await page.waitForSelector('.hfpxzc', { timeout: 10000 });
@@ -72,6 +95,15 @@ export async function scrapeGoogleMaps(
 
         rowIndex++;
         extracted++;
+
+        emit(projectId, StreamEventType.BROWSER_ROW_FOUND,
+          `Found: ${row.name}`,
+          {
+            detail: `${row.address || ''} • ${row.rating || ''}★`,
+            data: row,
+            progress: Math.round((extracted / maxResults) * 100)
+          });
+
       } catch (err) {
         console.error('Failed to extract Google Maps listing details:', err);
       }
@@ -90,6 +122,13 @@ export async function scrapeGoogleMaps(
       break;
     }
   }
+
+  emit(projectId, StreamEventType.BROWSER_COMPLETE,
+    `Extracted ${extracted} businesses`,
+    {
+      status: 'done',
+      data: { count: extracted }
+    });
 
   return extracted;
 }

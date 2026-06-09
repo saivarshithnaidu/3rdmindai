@@ -7,6 +7,8 @@ import toolsService from './tools.service';
 import mcpService from './mcp.service';
 import { DEFAULT_SUB_AGENT_MODEL, DEFAULT_ORCHESTRATOR_MODEL } from '../lib/constants';
 import { Agent } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 function getAppUrl() {
   if (process.env.NEXT_PUBLIC_APP_URL) {
@@ -188,6 +190,9 @@ export const orchestratorService = {
     summary: string; 
     managers: { name: string; role: string; task: string }[] 
   }> {
+    if (projectId) {
+      emit(projectId, StreamEventType.ORCHESTRATOR_THINKING, 'Orchestrator planning your goal...');
+    }
     let toolContext = "";
     try {
       const goalLower = goal.toLowerCase();
@@ -299,7 +304,14 @@ Respond ONLY with raw JSON. Do not include markdown code block formatting (no \`
       if (cleaned.startsWith('```')) {
         cleaned = cleaned.replace(/^```json\s*/i, '').replace(/```$/, '').trim();
       }
-      return JSON.parse(cleaned);
+      const plan = JSON.parse(cleaned);
+      if (projectId) {
+        emit(projectId, StreamEventType.ORCHESTRATOR_PLANNING, `Planned ${plan.managers?.length || 0} agents`, {
+          detail: plan.summary,
+          data: { agentCount: plan.managers?.length || 0 }
+        });
+      }
+      return plan;
     } catch (e) {
       console.error('Failed to parse manager plan JSON response:', responseText, e);
       // Fallback manager plan
@@ -322,6 +334,10 @@ Respond ONLY with raw JSON. Do not include markdown code block formatting (no \`
   },
 
   async dispatchManager(managerAgent: Agent, projectId: string, selectedModel: string, options?: any): Promise<void> {
+    emit(projectId, StreamEventType.ORCHESTRATOR_DISPATCHING, `Dispatching ${managerAgent.name}`, {
+      agentId: managerAgent.id,
+      agentName: managerAgent.name
+    });
     // 1. Set manager status to running
     await agentService.updateAgentStatus(managerAgent.id, 'running');
 
@@ -494,6 +510,11 @@ Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
             'executor',
             2000 // default budget for L3
           );
+          emit(projectId, StreamEventType.ORCHESTRATOR_SPAWNING_AGENT, `Spawning ${childAgent.name}`, {
+            agentName: childAgent.name,
+            detail: childAgent.role,
+            status: 'running'
+          });
           spawnedChildren.push(childAgent);
         }
 
@@ -544,6 +565,11 @@ Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
               "executor",
               2000
             );
+            emit(projectId, StreamEventType.ORCHESTRATOR_SPAWNING_AGENT, `Spawning Verdict`, {
+              agentName: 'Verdict',
+              detail: 'Final Arbiter',
+              status: 'running'
+            });
 
             await agentService.updateAgentStatus(verdictAgent.id, 'running');
 
@@ -631,6 +657,11 @@ ${siblingsOutput}`;
               "executor",
               2000
             );
+            emit(projectId, StreamEventType.ORCHESTRATOR_SPAWNING_AGENT, `Spawning ClaimExtractor`, {
+              agentName: 'ClaimExtractor',
+              detail: 'Consensus Matrix Extractor',
+              status: 'running'
+            });
 
             await agentService.updateAgentStatus(claimAgent.id, 'running');
 
@@ -855,6 +886,11 @@ Provide your detailed output directly.`;
   },
 
   async dispatchExecutor(executorAgent: Agent, parentAgent: Agent, selectedModel: string): Promise<void> {
+    emit(executorAgent.project_id, StreamEventType.AGENT_STARTED, `${executorAgent.name} started task`, {
+      agentId: executorAgent.id,
+      agentName: executorAgent.name,
+      detail: executorAgent.task || undefined
+    });
     await agentService.updateAgentStatus(executorAgent.id, 'running');
 
     // 1. Save auto task message
@@ -1123,6 +1159,7 @@ Provide your response directly. Keep it structured and high quality.`;
   },
 
   async synthesizeManager(managerAgent: Agent, projectId: string, selectedModel: string): Promise<string> {
+    emit(projectId, StreamEventType.ORCHESTRATOR_SYNTHESIZING, 'Synthesizing all agent outputs...');
     const children = await agentService.getAgentChildren(managerAgent.id);
     
     // Determine if this manager is the Root Council
@@ -1250,6 +1287,11 @@ Respond ONLY with raw JSON. Do not wrap it in markdown code blocks.`;
             'executor',
             2000
           );
+          emit(projectId, StreamEventType.ORCHESTRATOR_SPAWNING_AGENT, `Spawning ${childAgent.name}`, {
+            agentName: childAgent.name,
+            detail: 'Execution Task',
+            status: 'running'
+          });
           spawnedTasks.push(childAgent);
         }
 
@@ -1411,6 +1453,7 @@ Deliver a premium, publication-grade markdown document.`;
 
     // Update L1 root status to done
     await agentService.updateAgentStatus(rootOrchestrator.id, 'done');
+    emit(projectId, StreamEventType.ORCHESTRATOR_COMPLETE, 'All agents complete', { status: 'done' });
   },
 
   async runFullPipeline(goal: string, projectId: string, model: string): Promise<void> {
@@ -1449,6 +1492,11 @@ Deliver a premium, publication-grade markdown document.`;
             'executor', // Initially set to executor, decisions will toggle
             4000 // Manager budget
           );
+          emit(projectId, StreamEventType.ORCHESTRATOR_SPAWNING_AGENT, `Spawning ${managerAgent.name}`, {
+            agentName: managerAgent.name,
+            detail: managerAgent.role,
+            status: 'running'
+          });
           spawnedManagers.push(managerAgent);
         }
 

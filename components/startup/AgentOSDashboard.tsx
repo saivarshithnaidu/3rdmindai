@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { StartupAgent, AgentTask, AgentMessage, Project } from '../../types';
 import supabaseService from '../../services/supabase.service';
 import AgentCard from './AgentCard';
-import TaskFeed from './TaskFeed';
+import LiveFeed from '../stream/LiveFeed';
 import TaskModal from './TaskModal';
 import ApprovalCenter from './ApprovalCenter';
 import WeeklyDigest from './WeeklyDigest';
@@ -474,7 +474,7 @@ export default function AgentOSDashboard({ projectId }: AgentOSDashboardProps) {
               {/* Task feed under cards */}
               <div className="pt-4 border-t border-[#E5E0DA]">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-[#85827D] mb-4">Latest Task Outcomes</h3>
-                <TaskFeed projectId={projectId} agentNames={agentNamesMap} />
+                <LiveFeed projectId={projectId} />
               </div>
             </div>
 

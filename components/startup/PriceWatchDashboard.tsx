@@ -14,10 +14,11 @@ import {
   SlidersHorizontal,
   DollarSign
 } from 'lucide-react';
-import { PriceWatch, PriceHistory } from '../../types';
+import { PriceWatch, PriceHistory, StreamEventType } from '../../types';
 import PriceWatchCard from './PriceWatchCard';
 import AddWatchModal from './AddWatchModal';
 import PriceHistoryChart from './PriceHistoryChart';
+import LiveFeed from '../stream/LiveFeed';
 
 interface PriceWatchDashboardProps {
   projectId: string | null;
@@ -338,6 +339,24 @@ export default function PriceWatchDashboard({ projectId }: PriceWatchDashboardPr
               onViewHistory={handleViewHistory}
             />
           ))}
+        </div>
+      )}
+
+      {/* Live Feed for Price Scrapes */}
+      {projectId && (
+        <div className="mt-8 border-t border-[#E5E0DA] pt-6">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-[#85827D] mb-3">Live Scrape & Alert Monitor</h3>
+          <LiveFeed 
+            projectId={projectId} 
+            filterTypes={[
+              StreamEventType.PRICE_CHECKING, 
+              StreamEventType.PRICE_FOUND, 
+              StreamEventType.PRICE_TARGET_HIT, 
+              StreamEventType.PRICE_ALERT_SENT
+            ]}
+            compact={true}
+            maxHeight="250px"
+          />
         </div>
       )}
 

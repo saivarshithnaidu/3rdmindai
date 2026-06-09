@@ -2,6 +2,8 @@ import nodemailer from 'nodemailer';
 import twilio from 'twilio';
 import { PriceWatch } from '../types';
 import supabaseService from './supabase.service';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 const getTransporter = () => {
   const host = process.env.SMTP_HOST || 'smtp.mailtrap.io';
@@ -213,6 +215,9 @@ export const priceAlertService = {
         };
         await transporter.sendMail(mailOptions);
         await this.logAlertSent(watch.id, 'email', messageRecord, true);
+        emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
+          `Email alert sent to ${emailTo}`,
+          { status: 'done' });
         return { success: true, message: 'Email alert dispatched successfully via SMTP.' };
       } catch (err: any) {
         console.error('SMTP sending error:', err);
@@ -223,6 +228,9 @@ export const priceAlertService = {
       // Simulate
       console.log(`[SIMULATED EMAIL ALERT] To: ${emailTo}\nSubject: ${emailSubject}\nBody: See HTML content.`);
       await this.logAlertSent(watch.id, 'email', `[SIMULATED] ${messageRecord}`, true);
+      emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
+        `Email alert sent to ${emailTo}`,
+        { status: 'done' });
       return { success: true, message: 'Email alert simulated successfully.' };
     }
   },
@@ -265,6 +273,9 @@ export const priceAlertService = {
         });
 
         await this.logAlertSent(watch.id, 'whatsapp', messageText, true);
+        emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
+          `WhatsApp alert sent to ${phone}`,
+          { status: 'done' });
         return { success: true, message: 'WhatsApp alert dispatched successfully via Twilio.' };
       } catch (err: any) {
         console.error('Twilio sending error:', err);
@@ -275,6 +286,9 @@ export const priceAlertService = {
       // Simulate
       console.log(`[SIMULATED WHATSAPP ALERT] To: ${phone}\nMessage: ${messageText}`);
       await this.logAlertSent(watch.id, 'whatsapp', `[SIMULATED] ${messageText}`, true);
+      emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
+        `WhatsApp alert sent to ${phone}`,
+        { status: 'done' });
       return { success: true, message: 'WhatsApp alert simulated successfully.' };
     }
   },

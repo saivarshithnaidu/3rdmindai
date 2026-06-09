@@ -2,6 +2,8 @@ import supabaseService from './supabase.service';
 import mcpService from './mcp.service';
 import openrouterService from './openrouter.service';
 import judgeService from './judge.service';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 import agentMemoryService from './agent-memory.service';
 import agentCommsService from './agent-comms.service';
 import { CSO_IDENTITY } from '../lib/agent-identities';
@@ -16,6 +18,10 @@ export const csoPipelineService = {
     userId: string,
     count: number = 10
   ): Promise<OutreachLead[]> {
+    emit(projectId, StreamEventType.LEADS_SEARCHING,
+      `Searching for leads: ${targetMarket}`,
+      { agentId });
+
     const supabase = supabaseService.getServiceClient();
     const query = `${targetMarket} companies ${stage} startup`;
     const numResults = count * 2;
@@ -88,6 +94,12 @@ export const csoPipelineService = {
 
       if (!error && leadRecord) {
         leads.push(leadRecord);
+        emit(projectId, StreamEventType.LEAD_FOUND,
+          `Found: ${leadRecord.company_name}`,
+          {
+            agentId,
+            detail: leadRecord.industry?.substring(0, 80)
+          });
       }
     }
 
@@ -95,6 +107,13 @@ export const csoPipelineService = {
   },
 
   async researchLead(lead: OutreachLead, projectId: string, userId: string): Promise<OutreachLead> {
+    emit(projectId, StreamEventType.LEAD_RESEARCHING,
+      `Researching ${lead.company_name}`,
+      {
+        agentId: lead.agent_id,
+        detail: 'Checking recent news...'
+      });
+
     const supabase = supabaseService.getServiceClient();
     const query = `"${lead.company_name}" company size news pain points funding`;
 
@@ -149,6 +168,10 @@ Title: Co-Founder & CEO`;
     projectId: string,
     userId: string
   ): Promise<OutreachLead> {
+    emit(projectId, StreamEventType.EMAIL_DRAFTING,
+      `Drafting email for ${lead.company_name}`,
+      { agentId: agent.id });
+
     const supabase = supabaseService.getServiceClient();
 
     // Create a database task representing the email drafting work so it goes through the Judge Loop
@@ -334,6 +357,10 @@ Return ONLY valid JSON format containing "subject" and "body" keys (no markdown 
     }
 
     // Dispatch directly (semi-auto or full-auto)
+    emit(projectId, StreamEventType.EMAIL_SENDING,
+      `Sending to ${lead.contact_email}`,
+      { agentId: lead.agent_id });
+
     let sendResult: any;
     try {
       sendResult = await mcpService.callTool(
@@ -365,6 +392,14 @@ Return ONLY valid JSON format containing "subject" and "body" keys (no markdown 
       .eq('id', lead.id)
       .select()
       .single();
+
+    emit(projectId, StreamEventType.EMAIL_SENT,
+      `Email sent: ${lead.company_name}`,
+      {
+        agentId: lead.agent_id,
+        status: 'done',
+        detail: lead.email_subject || ''
+      });
 
     // Save to agent_memory
     await agentMemoryService.saveMemory(

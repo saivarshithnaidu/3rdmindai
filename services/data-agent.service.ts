@@ -2,6 +2,8 @@ import { supabaseService } from './supabase.service';
 import { openrouterService } from './openrouter.service';
 import * as XLSX from 'xlsx';
 import { ColumnSchema, Canvas, CanvasRow } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 export const dataAgentService = {
   async detectDataRequest(message: string): Promise<{
@@ -126,6 +128,10 @@ Example output:
     if (error) {
       throw new Error(`Failed to create canvas: ${error.message}`);
     }
+
+    emit(projectId, StreamEventType.CANVAS_CREATING,
+      `Creating spreadsheet: ${name}`);
+
     return data as Canvas;
   },
 
@@ -154,11 +160,47 @@ Example output:
     // Increment rows_done in canvases
     await supabase.rpc('increment_canvas_rows_done', { canvas_id_param: canvasId });
 
+    try {
+      const { data: canvas } = await supabase
+        .from('canvases')
+        .select('project_id')
+        .eq('id', canvasId)
+        .maybeSingle();
+      if (canvas?.project_id) {
+        emit(canvas.project_id, StreamEventType.CANVAS_ROW_ADDED,
+          `Row ${rowIndex + 1} added`,
+          {
+            data: {
+              rowIndex,
+              preview: Object.values(data).slice(0, 2).join(' • ')
+            }
+          });
+      }
+    } catch {}
+
     return rowData as CanvasRow;
   },
 
   async finalizeCanvas(canvasId: string, status: 'done' | 'error' = 'done'): Promise<void> {
     const supabase = supabaseService.getServiceClient();
+    
+    try {
+      const { data: canvas } = await supabase
+        .from('canvases')
+        .select('project_id, rows_done')
+        .eq('id', canvasId)
+        .maybeSingle();
+      if (canvas) {
+        const rowsDone = canvas.rows_done || 0;
+        emit(canvas.project_id, StreamEventType.CANVAS_COMPLETE,
+          `Spreadsheet complete: ${rowsDone} rows`,
+          {
+            status: status === 'done' ? 'done' : 'error',
+            data: { rowsDone }
+          });
+      }
+    } catch {}
+
     await supabase
       .from('canvases')
       .update({ status })

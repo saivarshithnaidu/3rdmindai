@@ -2,6 +2,8 @@ import supabaseService from './supabase.service';
 import agentRuntimeService from './agent-runtime.service';
 import agentMemoryService from './agent-memory.service';
 import mcpService from './mcp.service';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 import { AutonomousRun, PendingApproval, StartupAgent } from '../types';
 
 export const autonomousService = {
@@ -35,6 +37,10 @@ export const autonomousService = {
       .from('projects')
       .update({ autonomous_mode: true })
       .eq('id', projectId);
+
+    emit(projectId, StreamEventType.WEEKLY_RUN_STARTED,
+      'Weekly autonomous run starting...',
+      { detail: `Week of ${weekStart}` });
 
     // Run weekly orchestration asynchronously to not block the API request
     this.executeWeeklyOrchestration(run.id, projectId, userId).catch((err) => {
@@ -91,6 +97,10 @@ TO:CTO: Create database schema spec for the user auth flow.`;
         null
       );
 
+      emit(projectId, StreamEventType.AGENT_COMPLETE,
+        'CEO set weekly priorities',
+        { agentName: 'CEO', status: 'done' });
+ 
       // Parse CEO output for tasks assigned to roles
       const roleTasks: Record<string, string> = {};
       if (ceoTask.output) {
@@ -223,6 +233,16 @@ Read their outputs and produce a markdown summary with:
           summary: ceoSynthesisTask.output || 'Accomplishments synthesis complete.'
         })
         .eq('id', runId);
+
+      emit(projectId, StreamEventType.WEEKLY_RUN_COMPLETE,
+        'Weekly run complete',
+        {
+          status: 'done',
+          data: {
+            tasksCompleted: completedTasksCount,
+            emailsSent: emailCalls?.length || 0
+          }
+        });
 
       // Generate weekly digest automatically
       try {

@@ -2,6 +2,8 @@ import supabaseService from './supabase.service';
 import { decrypt, encrypt } from '../lib/crypto';
 import { Connector, MCPTool, ToolCall } from '../types';
 import { ALL_CONNECTORS } from '../lib/connectors.registry';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 // Simple in-memory cache for available tools
 let toolsCache: { timestamp: number; data: MCPTool[] } | null = null;
@@ -378,6 +380,16 @@ export const mcpService = {
       .single();
 
     const recordId = callRecord?.id;
+    const activeProjectId = projectId || '00000000-0000-0000-0000-000000000000';
+    const connectorName = connector?.name || connectorSlug;
+
+    emit(activeProjectId, StreamEventType.TOOL_CALLING,
+      `Calling ${toolName}`,
+      {
+        agentId: agentId || undefined,
+        detail: `via ${connectorName}`,
+        data: { tool: toolName, connector: connectorName, params }
+      });
 
     // Check approvals if running in autonomous supervised mode
     if (agentId && projectId) {
@@ -432,6 +444,15 @@ export const mcpService = {
 
       const duration = Date.now() - startTime;
 
+      emit(activeProjectId, StreamEventType.TOOL_RESULT,
+        `${toolName} returned result`,
+        {
+          agentId: agentId || undefined,
+          status: 'done',
+          detail: `${duration}ms`,
+          data: { resultPreview: JSON.stringify(resultData).substring(0, 100) }
+        });
+
       if (recordId) {
         await supabase
           .from('tool_calls')
@@ -447,6 +468,15 @@ export const mcpService = {
     } catch (e) {
       const duration = Date.now() - startTime;
       console.error(`Error executing tool ${toolName}:`, e);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+
+      emit(activeProjectId, StreamEventType.TOOL_FAILED,
+        `${toolName} failed`,
+        {
+          agentId: agentId || undefined,
+          status: 'error',
+          detail: errorMsg
+        });
 
       if (recordId) {
         await supabase

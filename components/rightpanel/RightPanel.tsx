@@ -6,6 +6,8 @@ import LiveDataCanvas from '../canvas/LiveDataCanvas';
 import LiveBrowser from '../browser/LiveBrowser';
 import ArtifactRenderer from '../artifacts/ArtifactRenderer';
 import ArtifactToolbar from '../artifacts/ArtifactToolbar';
+import LiveStreamPanel from '../stream/LiveStreamPanel';
+import { Radio as RadioIcon } from 'lucide-react';
 import ArtifactPicker from '../artifacts/ArtifactPicker';
 import CouncilDebateView from '../council/CouncilDebateView';
 import { 
@@ -40,8 +42,8 @@ interface RightPanelProps {
   onSelectAgent: (agentId: string | null) => void;
   isOpen: boolean;
   setIsOpen: (val: boolean) => void;
-  activeTab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools';
-  onTabChange: (tab: 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools') => void;
+  activeTab: 'stream' | 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools';
+  onTabChange: (tab: 'stream' | 'agents' | 'memory' | 'files' | 'preview' | 'canvas' | 'artifact' | 'council' | 'browser' | 'tools') => void;
   onProjectUpdate?: (project: Project) => void;
   previewContent?: string;
   previewTitle?: string;
@@ -379,6 +381,7 @@ export default function RightPanel({
       {!(isTabBarCollapsed && (activeTab === 'canvas' || activeTab === 'artifact')) && (
         <div className="flex items-center justify-center gap-1 px-3 py-2 border-b border-[#E5E0DA] bg-[#F4F0EB] shrink-0 animate-slideDown">
           {[
+            { key: 'stream' as const, icon: RadioIcon, tooltip: 'Live Stream', dot: 'bg-orange-500' },
             { key: 'agents' as const, icon: GitBranch, tooltip: 'Mind Network', dot: null },
             { key: 'tools' as const, icon: Sliders, tooltip: 'Connectors & Tools', dot: (effectiveCouncilMode || effectiveToolsState.webSearch || effectiveToolsState.exaSearch || effectiveToolsState.kaggle || effectiveToolsState.database || effectiveToolsState.rag) ? 'bg-emerald-500' : null },
             { key: 'files' as const, icon: Paperclip, tooltip: 'Files & Context', dot: null },
@@ -411,6 +414,12 @@ export default function RightPanel({
 
       {/* Tab Contents */}
       <div className="flex-grow overflow-y-auto p-4 scroll-smooth flex flex-col">
+        {activeTab === 'stream' && (
+          <div id="workspace-stream-section" className="flex-grow flex flex-col h-full min-h-[400px] overflow-hidden">
+            <LiveStreamPanel projectId={project.id} />
+          </div>
+        )}
+
         {activeTab === 'tools' && (
           <div id="workspace-tools-section" className="space-y-4 animate-fadeIn">
             <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#85827D] uppercase tracking-wider mb-2 font-dmsans">

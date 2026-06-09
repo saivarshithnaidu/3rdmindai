@@ -1,5 +1,7 @@
 import supabaseService from './supabase.service';
 import { StartupAgent, AgentMessage, AgentRole } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 export const agentCommsService = {
   async sendMessage(
@@ -38,8 +40,22 @@ export const agentCommsService = {
       .eq('id', fromAgentId)
       .single();
     
+    const { data: toAgent } = await supabase
+      .from('startup_agents')
+      .select('name, role')
+      .eq('id', toAgentId)
+      .single();
+    
     const fromName = fromAgent?.name || 'Team';
+    const toName = toAgent?.name || 'Recipient';
     const fromRole = (fromAgent?.role || 'agent').toUpperCase();
+
+    emit(projectId, StreamEventType.AGENT_MESSAGE_SENT,
+      `${fromName} → ${toName}`,
+      {
+        agentId: fromAgentId,
+        detail: content.substring(0, 100)
+      });
 
     // 3. Queue task for toAgent
     try {
@@ -129,6 +145,13 @@ export const agentCommsService = {
       const targetAgent = allAgents.find((a) => a.role === roleStr);
       // Ensure we don't message ourselves
       if (targetAgent && targetAgent.id !== fromAgent.id) {
+        emit(projectId, StreamEventType.AGENT_TASK_QUEUED,
+          `${targetAgent.name} received new task`,
+          {
+            agentId: targetAgent.id,
+            detail: content.substring(0, 100)
+          });
+
         const subject = `Direct instruction from ${fromAgent.role.toUpperCase()} (${fromAgent.name})`;
         try {
           await this.sendMessage(

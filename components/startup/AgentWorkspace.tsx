@@ -13,6 +13,7 @@ import OutreachTracker from './OutreachTracker';
 import AgentBrowserSessionsPanel from './AgentBrowserSessionsPanel';
 import ToolCallBlock from '../workspace/ToolCallBlock';
 import ReactMarkdown from 'react-markdown';
+import LiveFeed from '../stream/LiveFeed';
 import { Play, Loader2, Brain, Mail, Settings, ChevronLeft, ChevronDown, ChevronUp, Bot, Sparkles, Check, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -448,6 +449,16 @@ export default function AgentWorkspace({ agentId, projectId, allProjects }: Agen
               );
             })
           )}
+        </div>
+
+        {/* Live Activity Feed */}
+        <div className="border-t border-[#E5E0DA] pt-4 flex flex-col min-h-[250px] max-h-[350px] shrink-0">
+          <h3 className="font-lora text-xs font-bold text-[#191919] mb-2 uppercase tracking-wider">
+            Live Activity
+          </h3>
+          <div className="flex-1 overflow-hidden bg-white border border-[#E5E0DA] rounded-3xl p-4 min-h-0 shadow-2xs">
+            <LiveFeed projectId={projectId} filterAgentId={agentId} compact={true} />
+          </div>
         </div>
       </div>
 

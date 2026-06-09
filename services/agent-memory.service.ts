@@ -1,6 +1,8 @@
 import supabaseService from './supabase.service';
 import openrouterService from './openrouter.service';
 import { MemoryType, AgentMemory, AgentTask } from '../types';
+import { emit } from '../lib/emit';
+import { StreamEventType } from '../lib/stream-events';
 
 export const agentMemoryService = {
   async saveMemory(
@@ -27,6 +29,20 @@ export const agentMemoryService = {
       throw new Error(`Failed to save memory: ${error.message}`);
     }
 
+    (async () => {
+      try {
+        const { data: ag } = await supabase.from('startup_agents').select('name').eq('id', agentId).maybeSingle();
+        const agentName = ag?.name || 'Agent';
+        emit(projectId, StreamEventType.MEMORY_SAVING,
+          `Saving memory for ${agentName}`,
+          {
+            agentId,
+            agentName,
+            detail: content.substring(0, 80)
+          });
+      } catch {}
+    })();
+
     // Generate vector embedding asynchronously (don't block task execution)
     import('./embedding.service')
       .then(({ default: embeddingService }) => {
@@ -47,6 +63,17 @@ export const agentMemoryService = {
     query?: string,
     limit: number = 10
   ): Promise<string> {
+    const supabase = supabaseService.getClient();
+    let agentName = 'Agent';
+    try {
+      const { data: agent } = await supabase
+        .from('startup_agents')
+        .select('name')
+        .eq('id', agentId)
+        .maybeSingle();
+      if (agent?.name) agentName = agent.name;
+    } catch {}
+
     if (query && query.trim().length > 0) {
       try {
         const { default: embeddingService } = await import('./embedding.service');
@@ -57,6 +84,16 @@ export const agentMemoryService = {
           limit,
           0.7
         );
+        if (semanticMatches && semanticMatches.length > 0) {
+          emit(projectId, StreamEventType.MEMORY_RECALLED,
+            `${agentName} recalled ${semanticMatches.length} memories`,
+            {
+              agentId,
+              agentName,
+              detail: `Query: ${query.substring(0, 50)}`,
+              data: { count: semanticMatches.length, query }
+            });
+        }
         if (semanticMatches && semanticMatches.length > 0) {
           return semanticMatches
             .map(
@@ -72,7 +109,6 @@ export const agentMemoryService = {
       }
     }
 
-    const supabase = supabaseService.getClient();
     let dbQuery = supabase
       .from('agent_memory')
       .select('*')
@@ -90,6 +126,17 @@ export const agentMemoryService = {
     if (error) {
       console.warn(`Failed to recall memory for agent ${agentId}:`, error.message);
       return 'No memories found.';
+    }
+
+    if (data && data.length > 0) {
+      emit(projectId, StreamEventType.MEMORY_RECALLED,
+        `${agentName} recalled ${data.length} memories`,
+        {
+          agentId,
+          agentName,
+          detail: query ? `Query: ${query.substring(0, 50)}` : 'Recalled context',
+          data: { count: data.length, query }
+        });
     }
 
     if (!data || data.length === 0) {
