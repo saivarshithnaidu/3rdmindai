@@ -397,6 +397,19 @@ export default function Sidebar({
             if (onNavClick) onNavClick('Gallery');
           }}
         />
+        <NavItem 
+          label="Coding" 
+          icon={<i className="ti ti-code text-sm" />} 
+          active={activeNavItem === 'Coding'}
+          onClick={() => {
+            if (activeProjectId) {
+              router.push(`/coding?projectId=${activeProjectId}`);
+            } else {
+              router.push('/coding');
+            }
+            if (onNavClick) onNavClick('Coding');
+          }}
+        />
       </div>
 
       {/* Global Activity Indicator */}
