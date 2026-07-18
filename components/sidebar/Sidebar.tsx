@@ -186,256 +186,257 @@ export default function Sidebar({
         </div>
       </div>
 
-      <div className="h-px bg-[#E5E0DA] my-1 mx-3" />
+      {/* Scrollable Middle Container */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden scroll-smooth flex flex-col py-1">
+        {/* Main Navigation */}
+        <div className="px-2.5 space-y-0.5 shrink-0">
+          <NavItem 
+            label="Chats" 
+            icon={<MessageSquare className="w-4 h-4" />} 
+            active={activeNavItem === 'Chats'}
+            onClick={() => {
+              if (onNavClick) onNavClick('Chats');
+            }}
+          />
+          <NavItem 
+            label="Agents" 
+            icon={<Bot className="w-4 h-4" />} 
+            active={activeNavItem === 'Agents'}
+            onClick={() => {
+              if (onNavClick) onNavClick('Agents');
+            }}
+          />
+          <NavItem 
+            label="Artifacts" 
+            icon={<LayoutGrid className="w-4 h-4" />} 
+            active={activeNavItem === 'Artifacts'}
+            onClick={() => {
+              if (onNavClick) onNavClick('Artifacts');
+            }}
+          />
+          <NavItem 
+            label="Memory" 
+            icon={<Brain className="w-4 h-4" />} 
+            active={activeNavItem === 'Memory'}
+            onClick={() => {
+              if (onNavClick) onNavClick('Memory');
+            }}
+          />
+          <NavItem 
+            label="Connectors" 
+            icon={<i className="ti ti-plug-connected text-sm" />} 
+            active={activeNavItem === 'Connectors'}
+            onClick={() => {
+              router.push('/connectors');
+              if (onNavClick) onNavClick('Connectors');
+            }}
+            badge={connectedCount > 0 ? (
+              <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+                {connectedCount}
+              </span>
+            ) : null}
+          />
+          <NavItem 
+            label="Board" 
+            icon={<i className="ti ti-building-bank text-sm" />} 
+            active={activeNavItem === 'Board'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/board?projectId=${activeProjectId}`);
+              } else {
+                router.push('/board');
+              }
+              if (onNavClick) onNavClick('Board');
+            }}
+            badge={(
+              <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+                6
+              </span>
+            )}
+          />
+          <NavItem 
+            label="Due Diligence" 
+            icon={<i className="ti ti-report-search text-sm" />} 
+            active={activeNavItem === 'Due Diligence'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/due-diligence?projectId=${activeProjectId}`);
+              } else {
+                router.push('/due-diligence');
+              }
+              if (onNavClick) onNavClick('Due Diligence');
+            }}
+          />
+          <NavItem 
+            label="Hiring" 
+            icon={<i className="ti ti-users-group text-sm" />} 
+            active={activeNavItem === 'Hiring'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/hiring?projectId=${activeProjectId}`);
+              } else {
+                router.push('/hiring');
+              }
+              if (onNavClick) onNavClick('Hiring');
+            }}
+          />
+          <NavItem 
+            label="Reputation" 
+            icon={<i className="ti ti-social text-sm" />} 
+            active={activeNavItem === 'Reputation'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/reputation?projectId=${activeProjectId}`);
+              } else {
+                router.push('/reputation');
+              }
+              if (onNavClick) onNavClick('Reputation');
+            }}
+          />
+          <NavItem 
+            label="Price Watch" 
+            icon={<i className="ti ti-tag text-sm" />} 
+            active={activeNavItem === 'Price Watch'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/price-watch?projectId=${activeProjectId}`);
+              } else {
+                router.push('/price-watch');
+              }
+              if (onNavClick) onNavClick('Price Watch');
+            }}
+          />
+          <NavItem 
+            label="Ad Intel" 
+            icon={<i className="ti ti-ad-2 text-sm" />} 
+            active={activeNavItem === 'Ad Intel'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/ad-intel?projectId=${activeProjectId}`);
+              } else {
+                router.push('/ad-intel');
+              }
+              if (onNavClick) onNavClick('Ad Intel');
+            }}
+          />
+          <NavItem 
+            label="Contracts" 
+            icon={<i className="ti ti-file-certificate text-sm" />} 
+            active={activeNavItem === 'Contracts'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/contracts?projectId=${activeProjectId}`);
+              } else {
+                router.push('/contracts');
+              }
+              if (onNavClick) onNavClick('Contracts');
+            }}
+          />
+          <NavItem 
+            label="Funding Finder" 
+            icon={<i className="ti ti-currency-rupee text-sm" />} 
+            active={activeNavItem === 'Funding Finder'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/funding?projectId=${activeProjectId}`);
+              } else {
+                router.push('/funding');
+              }
+              if (onNavClick) onNavClick('Funding Finder');
+            }}
+          />
+          <NavItem 
+            label="Health Check" 
+            icon={<i className="ti ti-heart-rate-monitor text-sm" />} 
+            active={activeNavItem === 'Health Check'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/health?projectId=${activeProjectId}`);
+              } else {
+                router.push('/health');
+              }
+              if (onNavClick) onNavClick('Health Check');
+            }}
+          />
+          <NavItem 
+            label="Procurement" 
+            icon={<i className="ti ti-shopping-cart text-sm" />} 
+            active={activeNavItem === 'Procurement'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/procurement?projectId=${activeProjectId}`);
+              } else {
+                router.push('/procurement');
+              }
+              if (onNavClick) onNavClick('Procurement');
+            }}
+          />
+          <NavItem 
+            label="Briefings" 
+            icon={<i className="ti ti-microphone text-sm" />} 
+            active={activeNavItem === 'Briefings'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/briefing?projectId=${activeProjectId}`);
+              } else {
+                router.push('/briefing');
+              }
+              if (onNavClick) onNavClick('Briefings');
+            }}
+          />
+          <NavItem 
+            label="Gallery" 
+            icon={<i className="ti ti-photo text-sm" />} 
+            active={activeNavItem === 'Gallery'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/gallery?projectId=${activeProjectId}`);
+              } else {
+                router.push('/gallery');
+              }
+              if (onNavClick) onNavClick('Gallery');
+            }}
+          />
+          <NavItem 
+            label="Coding" 
+            icon={<i className="ti ti-code text-sm" />} 
+            active={activeNavItem === 'Coding'}
+            onClick={() => {
+              if (activeProjectId) {
+                router.push(`/coding?projectId=${activeProjectId}`);
+              } else {
+                router.push('/coding');
+              }
+              if (onNavClick) onNavClick('Coding');
+            }}
+          />
+        </div>
 
-      {/* Main Navigation */}
-      <div className="px-2.5 space-y-0.5">
-        <NavItem 
-          label="Chats" 
-          icon={<MessageSquare className="w-4 h-4" />} 
-          active={activeNavItem === 'Chats'}
-          onClick={() => {
-            if (onNavClick) onNavClick('Chats');
-          }}
-        />
-        <NavItem 
-          label="Agents" 
-          icon={<Bot className="w-4 h-4" />} 
-          active={activeNavItem === 'Agents'}
-          onClick={() => {
-            if (onNavClick) onNavClick('Agents');
-          }}
-        />
-        <NavItem 
-          label="Artifacts" 
-          icon={<LayoutGrid className="w-4 h-4" />} 
-          active={activeNavItem === 'Artifacts'}
-          onClick={() => {
-            if (onNavClick) onNavClick('Artifacts');
-          }}
-        />
-        <NavItem 
-          label="Memory" 
-          icon={<Brain className="w-4 h-4" />} 
-          active={activeNavItem === 'Memory'}
-          onClick={() => {
-            if (onNavClick) onNavClick('Memory');
-          }}
-        />
-        <NavItem 
-          label="Connectors" 
-          icon={<i className="ti ti-plug-connected text-sm" />} 
-          active={activeNavItem === 'Connectors'}
-          onClick={() => {
-            router.push('/connectors');
-            if (onNavClick) onNavClick('Connectors');
-          }}
-          badge={connectedCount > 0 ? (
-            <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
-              {connectedCount}
+        {/* Global Activity Indicator */}
+        {isWorking && activeCount > 0 && (
+          <div className="px-4 py-2.5 mx-3 my-2 bg-white border border-[#E5E0DA] rounded-xl flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200">
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              <span className="text-[11px] font-bold text-[#5E5B56]">Agents working...</span>
+            </div>
+            <span className="text-[10px] text-green-700 bg-green-50 border border-green-200/50 px-2 py-0.5 rounded-full font-extrabold uppercase shrink-0">
+              {activeCount} active
             </span>
-          ) : null}
-        />
-        <NavItem 
-          label="Board" 
-          icon={<i className="ti ti-building-bank text-sm" />} 
-          active={activeNavItem === 'Board'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/board?projectId=${activeProjectId}`);
-            } else {
-              router.push('/board');
-            }
-            if (onNavClick) onNavClick('Board');
-          }}
-          badge={(
-            <span className="bg-primary/20 text-primary px-1.5 py-0.5 rounded-full text-[9px] font-bold">
-              6
-            </span>
-          )}
-        />
-        <NavItem 
-          label="Due Diligence" 
-          icon={<i className="ti ti-report-search text-sm" />} 
-          active={activeNavItem === 'Due Diligence'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/due-diligence?projectId=${activeProjectId}`);
-            } else {
-              router.push('/due-diligence');
-            }
-            if (onNavClick) onNavClick('Due Diligence');
-          }}
-        />
-        <NavItem 
-          label="Hiring" 
-          icon={<i className="ti ti-users-group text-sm" />} 
-          active={activeNavItem === 'Hiring'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/hiring?projectId=${activeProjectId}`);
-            } else {
-              router.push('/hiring');
-            }
-            if (onNavClick) onNavClick('Hiring');
-          }}
-        />
-        <NavItem 
-          label="Reputation" 
-          icon={<i className="ti ti-social text-sm" />} 
-          active={activeNavItem === 'Reputation'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/reputation?projectId=${activeProjectId}`);
-            } else {
-              router.push('/reputation');
-            }
-            if (onNavClick) onNavClick('Reputation');
-          }}
-        />
-        <NavItem 
-          label="Price Watch" 
-          icon={<i className="ti ti-tag text-sm" />} 
-          active={activeNavItem === 'Price Watch'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/price-watch?projectId=${activeProjectId}`);
-            } else {
-              router.push('/price-watch');
-            }
-            if (onNavClick) onNavClick('Price Watch');
-          }}
-        />
-        <NavItem 
-          label="Ad Intel" 
-          icon={<i className="ti ti-ad-2 text-sm" />} 
-          active={activeNavItem === 'Ad Intel'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/ad-intel?projectId=${activeProjectId}`);
-            } else {
-              router.push('/ad-intel');
-            }
-            if (onNavClick) onNavClick('Ad Intel');
-          }}
-        />
-        <NavItem 
-          label="Contracts" 
-          icon={<i className="ti ti-file-certificate text-sm" />} 
-          active={activeNavItem === 'Contracts'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/contracts?projectId=${activeProjectId}`);
-            } else {
-              router.push('/contracts');
-            }
-            if (onNavClick) onNavClick('Contracts');
-          }}
-        />
-        <NavItem 
-          label="Funding Finder" 
-          icon={<i className="ti ti-currency-rupee text-sm" />} 
-          active={activeNavItem === 'Funding Finder'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/funding?projectId=${activeProjectId}`);
-            } else {
-              router.push('/funding');
-            }
-            if (onNavClick) onNavClick('Funding Finder');
-          }}
-        />
-        <NavItem 
-          label="Health Check" 
-          icon={<i className="ti ti-heart-rate-monitor text-sm" />} 
-          active={activeNavItem === 'Health Check'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/health?projectId=${activeProjectId}`);
-            } else {
-              router.push('/health');
-            }
-            if (onNavClick) onNavClick('Health Check');
-          }}
-        />
-        <NavItem 
-          label="Procurement" 
-          icon={<i className="ti ti-shopping-cart text-sm" />} 
-          active={activeNavItem === 'Procurement'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/procurement?projectId=${activeProjectId}`);
-            } else {
-              router.push('/procurement');
-            }
-            if (onNavClick) onNavClick('Procurement');
-          }}
-        />
-        <NavItem 
-          label="Briefings" 
-          icon={<i className="ti ti-microphone text-sm" />} 
-          active={activeNavItem === 'Briefings'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/briefing?projectId=${activeProjectId}`);
-            } else {
-              router.push('/briefing');
-            }
-            if (onNavClick) onNavClick('Briefings');
-          }}
-        />
-        <NavItem 
-          label="Gallery" 
-          icon={<i className="ti ti-photo text-sm" />} 
-          active={activeNavItem === 'Gallery'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/gallery?projectId=${activeProjectId}`);
-            } else {
-              router.push('/gallery');
-            }
-            if (onNavClick) onNavClick('Gallery');
-          }}
-        />
-        <NavItem 
-          label="Coding" 
-          icon={<i className="ti ti-code text-sm" />} 
-          active={activeNavItem === 'Coding'}
-          onClick={() => {
-            if (activeProjectId) {
-              router.push(`/coding?projectId=${activeProjectId}`);
-            } else {
-              router.push('/coding');
-            }
-            if (onNavClick) onNavClick('Coding');
-          }}
-        />
-      </div>
-
-      {/* Global Activity Indicator */}
-      {isWorking && activeCount > 0 && (
-        <div className="px-4 py-2.5 mx-3 my-2 bg-white border border-[#E5E0DA] rounded-xl flex items-center justify-between shrink-0 shadow-2xs transition-all duration-200">
-          <div className="flex items-center gap-2">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-            </span>
-            <span className="text-[11px] font-bold text-[#5E5B56]">Agents working...</span>
           </div>
-          <span className="text-[10px] text-green-700 bg-green-50 border border-green-200/50 px-2 py-0.5 rounded-full font-extrabold uppercase shrink-0">
-            {activeCount} active
-          </span>
-        </div>
-      )}
+        )}
 
-      <div className="h-px bg-[#E5E0DA] my-1 mx-3" />
+        <div className="h-px bg-[#E5E0DA] my-1 mx-3 shrink-0" />
 
-      {/* Recent Projects List */}
-      <div className="flex-1 mt-4 px-3 overflow-hidden flex flex-col">
-        <div className="text-[11px] font-bold text-[#85827D] px-3 mb-1.5 font-dmsans">
-          Recents
+        {/* Recent Projects List */}
+        <div className="mt-4 px-3 flex flex-col shrink-0">
+          <div className="text-[11px] font-bold text-[#85827D] px-3 mb-1.5 font-dmsans">
+            Recents
+          </div>
+          <ProjectList projects={filteredProjects} activeProjectId={activeProjectId} />
         </div>
-        <ProjectList projects={filteredProjects} activeProjectId={activeProjectId} />
       </div>
 
       {/* Bottom User Profile */}

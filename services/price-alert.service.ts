@@ -215,6 +215,7 @@ export const priceAlertService = {
         };
         await transporter.sendMail(mailOptions);
         await this.logAlertSent(watch.id, 'email', messageRecord, true);
+        this.recordPriceAlertOutcome(watch);
         emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
           `Email alert sent to ${emailTo}`,
           { status: 'done' });
@@ -228,6 +229,7 @@ export const priceAlertService = {
       // Simulate
       console.log(`[SIMULATED EMAIL ALERT] To: ${emailTo}\nSubject: ${emailSubject}\nBody: See HTML content.`);
       await this.logAlertSent(watch.id, 'email', `[SIMULATED] ${messageRecord}`, true);
+      this.recordPriceAlertOutcome(watch);
       emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
         `Email alert sent to ${emailTo}`,
         { status: 'done' });
@@ -273,6 +275,7 @@ export const priceAlertService = {
         });
 
         await this.logAlertSent(watch.id, 'whatsapp', messageText, true);
+        this.recordPriceAlertOutcome(watch);
         emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
           `WhatsApp alert sent to ${phone}`,
           { status: 'done' });
@@ -286,6 +289,7 @@ export const priceAlertService = {
       // Simulate
       console.log(`[SIMULATED WHATSAPP ALERT] To: ${phone}\nMessage: ${messageText}`);
       await this.logAlertSent(watch.id, 'whatsapp', `[SIMULATED] ${messageText}`, true);
+      this.recordPriceAlertOutcome(watch);
       emit(watch.project_id || '00000000-0000-0000-0000-000000000000', StreamEventType.PRICE_ALERT_SENT,
         `WhatsApp alert sent to ${phone}`,
         { status: 'done' });
@@ -302,6 +306,34 @@ export const priceAlertService = {
       delivered,
       sent_at: new Date().toISOString()
     });
+  },
+
+  async recordPriceAlertOutcome(watch: PriceWatch): Promise<void> {
+    try {
+      const projectId = watch.project_id;
+      if (!projectId) return;
+      
+      const supabase = supabaseService.getServiceClient();
+      const { data: agents } = await supabase
+        .from('startup_agents')
+        .select('id, role')
+        .eq('project_id', projectId)
+        .eq('is_active', true);
+      
+      if (!agents || agents.length === 0) return;
+      
+      const cfo = agents.find(a => a.role === 'cfo');
+      const ceo = agents.find(a => a.role === 'ceo');
+      const agentId = cfo?.id || ceo?.id || agents[0].id;
+      
+      const { default: learningService } = await import('./learning.service');
+      await learningService.recordOutcome(null, agentId, projectId, 'user_approved', 1.0, {
+        watch_id: watch.id,
+        product_name: watch.product_name
+      });
+    } catch (err) {
+      console.error('Failed to record price alert outcome:', err);
+    }
   }
 };
 

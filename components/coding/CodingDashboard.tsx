@@ -5,6 +5,8 @@ import BuildInput from './BuildInput';
 import { CODE_TEMPLATES } from '../../lib/code-templates';
 import { CodingSession, CodeFile, CodeTemplate } from '../../types/coding';
 import supabaseService from '../../services/supabase.service';
+import CodebaseIndexer from './CodebaseIndexer';
+import DeploymentMonitor from './DeploymentMonitor';
 
 interface CodingDashboardProps {
   projectId: string;
@@ -302,6 +304,12 @@ export default function CodingDashboard({
           </div>
         )}
       </div>
+
+      {/* Codebase Intelligence Section */}
+      <CodebaseIndexer projectId={projectId} userId={userId} />
+
+      {/* Live deployments Section */}
+      <DeploymentMonitor projectId={projectId} />
 
       {/* BUILD MODAL CONTAINER */}
       {activeModal === 'build' && (

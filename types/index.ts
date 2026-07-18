@@ -182,6 +182,12 @@ export interface StartupAgent {
   last_run_at: string | null;
   tasks_completed: number;
   created_at: string;
+  strategy_version?: number;
+  strategyVersion?: number;
+  total_learnings?: number;
+  totalLearnings?: number;
+  last_5_scores?: (number | null)[];
+  last5Scores?: (number | null)[];
 }
 
 export interface AgentTask {
@@ -472,6 +478,77 @@ export interface GeneratedCampaign {
   ad_variations: AdVariation[];
   strategy: string | null;
   status: 'draft' | 'approved' | 'running';
+  created_at: string;
+}
+
+
+export interface AgentPerformanceLog {
+  id: string;
+  agent_id: string;
+  project_id: string;
+  task_id: string | null;
+  judge_score: number | null;
+  user_rating: number | null;
+  user_edited: boolean;
+  user_edit_delta?: string | null;
+  outcome_type: string | null;
+  outcome_value: number | null;
+  task_category: string;
+  task_keywords: string[];
+  approach_used: string;
+  what_worked: string | null;
+  what_failed: string | null;
+  created_at: string;
+}
+
+export interface AgentLearning {
+  id: string;
+  agent_id: string;
+  project_id: string;
+  learning_type: 'approach'|'tone'|'format'|'timing'|'tool_usage'|'user_preference'|'outcome_pattern';
+  category: string;
+  insight: string;
+  confidence: number;
+  evidence_count: number;
+  last_reinforced: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AgentStrategyVersion {
+  id: string;
+  agent_id: string;
+  project_id: string;
+  version: number;
+  strategy_additions: string;
+  strategy_removals: string | null;
+  triggered_by: string;
+  avg_score_before: number | null;
+  avg_score_after: number | null;
+  created_at: string;
+}
+
+export interface OutcomeEvent {
+  id: string;
+  project_id: string;
+  agent_id: string;
+  task_id: string | null;
+  event_type: string;
+  event_value: number | null;
+  metadata: Record<string, unknown>;
+  recorded_at: string;
+}
+
+export interface UserFeedback {
+  id: string;
+  agent_id: string;
+  task_id: string;
+  project_id: string;
+  rating: number | null;
+  feedback_text: string | null;
+  output_edited: boolean;
+  original_output: string | null;
+  edited_output: string | null;
   created_at: string;
 }
 

@@ -306,6 +306,16 @@ Read their outputs and produce a markdown summary with:
       throw new Error(`Failed to approve: ${updateErr?.message}`);
     }
 
+    import('./learning.service').then(({ learningService }) => {
+      learningService.recordOutcome(
+        updatedApproval.task_id,
+        updatedApproval.agent_id,
+        updatedApproval.project_id,
+        'user_approved',
+        1.0
+      ).catch(err => console.error('Failed to record approved outcome:', err));
+    });
+
     // 2. Check task status to see if agent thread is still active
     const { data: task } = await supabase
       .from('agent_tasks')
@@ -380,6 +390,16 @@ Read their outputs and produce a markdown summary with:
     if (error || !updatedApproval) {
       throw new Error(`Failed to reject: ${error?.message}`);
     }
+
+    import('./learning.service').then(({ learningService }) => {
+      learningService.recordOutcome(
+        updatedApproval.task_id,
+        updatedApproval.agent_id,
+        updatedApproval.project_id,
+        'user_rejected',
+        0.0
+      ).catch(err => console.error('Failed to record rejected outcome:', err));
+    });
 
     // Notify agent memory
     await agentMemoryService.saveMemory(

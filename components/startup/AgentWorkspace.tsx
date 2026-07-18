@@ -14,6 +14,8 @@ import AgentBrowserSessionsPanel from './AgentBrowserSessionsPanel';
 import ToolCallBlock from '../workspace/ToolCallBlock';
 import ReactMarkdown from 'react-markdown';
 import LiveFeed from '../stream/LiveFeed';
+import TaskFeedback from '../learning/TaskFeedback';
+import LearningPanel from '../learning/LearningPanel';
 import { Play, Loader2, Brain, Mail, Settings, ChevronLeft, ChevronDown, ChevronUp, Bot, Sparkles, Check, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -49,7 +51,7 @@ export default function AgentWorkspace({ agentId, projectId, allProjects }: Agen
   const [runningOutput, setRunningOutput] = useState('');
   
   // Right sidebar tabs
-  const [activeTab, setActiveTab] = useState<'memory' | 'messages' | 'browser' | 'judge' | 'analytics' | 'outreach' | 'settings'>('memory');
+  const [activeTab, setActiveTab] = useState<'memory' | 'messages' | 'browser' | 'judge' | 'analytics' | 'learning' | 'outreach' | 'settings'>('memory');
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -442,6 +444,17 @@ export default function AgentWorkspace({ agentId, projectId, allProjects }: Agen
                             )}
                           </div>
                         </div>
+
+                        {task.status === 'done' && (
+                          <TaskFeedback
+                            taskId={task.id}
+                            agentId={agentId}
+                            projectId={projectId}
+                            agentName={agent.name}
+                            originalOutput={task.output}
+                            onFeedbackSubmitted={loadAgentAndTasks}
+                          />
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
@@ -473,6 +486,7 @@ export default function AgentWorkspace({ agentId, projectId, allProjects }: Agen
               { id: 'browser', label: 'Browser' },
               { id: 'judge', label: 'Judge' },
               { id: 'analytics', label: 'Analytics' },
+              { id: 'learning', label: 'Learning' },
               ...(agent.role === 'cso' ? [{ id: 'outreach', label: 'Outreach' }] : []),
               { id: 'settings', label: 'Settings' }
             ].map((tab) => {
@@ -515,6 +529,10 @@ export default function AgentWorkspace({ agentId, projectId, allProjects }: Agen
 
             {activeTab === 'analytics' && (
               <AnalyticsPanel agentId={agentId} projectId={projectId} />
+            )}
+
+            {activeTab === 'learning' && (
+              <LearningPanel agentId={agentId} projectId={projectId} agentName={agent.name} />
             )}
 
             {activeTab === 'outreach' && agent.role === 'cso' && (

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StartupAgent, AgentRole } from '../../types';
 import ReactMarkdown from 'react-markdown';
-import { X, Play, Sparkles, Loader2, Link2 } from 'lucide-react';
+import { X, Play, Sparkles, Loader2, Link2, Star } from 'lucide-react';
 
 interface TaskModalProps {
   agent: StartupAgent;
@@ -61,7 +61,38 @@ export default function TaskModal({ agent, projectId, onClose, onTaskStarted }: 
   const [notionConnected, setNotionConnected] = useState(false);
   const [executing, setExecuting] = useState(false);
   const [streamedOutput, setStreamedOutput] = useState('');
+  const [taskCompleted, setTaskCompleted] = useState(false);
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [modalRating, setModalRating] = useState<number | null>(null);
+  const [hoveredRating, setHoveredRating] = useState<number | null>(null);
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [ratingSubmitting, setRatingSubmitting] = useState(false);
   const outputEndRef = useRef<HTMLDivElement>(null);
+
+  const handleRateTask = async (stars: number) => {
+    if (!createdTaskId || ratingSubmitting) return;
+    setModalRating(stars);
+    setRatingSubmitting(true);
+    try {
+      const res = await fetch('/api/learning/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: createdTaskId,
+          agentId: agent.id,
+          projectId,
+          rating: stars
+        })
+      });
+      if (res.ok) {
+        setRatingSubmitted(true);
+      }
+    } catch (err) {
+      console.error('Failed to submit rating feedback in TaskModal:', err);
+    } finally {
+      setRatingSubmitting(false);
+    }
+  };
 
   const meta = roleMeta[agent.role];
   const chips = suggestedChips[agent.role] || [];
@@ -106,6 +137,11 @@ export default function TaskModal({ agent, projectId, onClose, onTaskStarted }: 
         }),
       });
 
+      const taskIdHeader = response.headers.get('x-task-id');
+      if (taskIdHeader) {
+        setCreatedTaskId(taskIdHeader);
+      }
+
       if (!response.body) {
         throw new Error('ReadableStream not supported or empty response body.');
       }
@@ -126,6 +162,7 @@ export default function TaskModal({ agent, projectId, onClose, onTaskStarted }: 
       setStreamedOutput((prev) => prev + `\n\n[Execution Error]: ${err.message || String(err)}`);
     } finally {
       // Do not reset executing immediately so user can view full logs. We just stop loading state.
+      setTaskCompleted(true);
     }
   };
 
@@ -234,6 +271,40 @@ export default function TaskModal({ agent, projectId, onClose, onTaskStarted }: 
                 )}
                 <div ref={outputEndRef} />
               </div>
+
+              {taskCompleted && createdTaskId && (
+                <div className="p-4 bg-[#FBF9F6] border border-[#E5E0DA] rounded-2xl flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[#5E5B56]">How was this output?</span>
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((stars) => (
+                        <button
+                          key={stars}
+                          type="button"
+                          disabled={ratingSubmitting || ratingSubmitted}
+                          onClick={() => handleRateTask(stars)}
+                          onMouseEnter={() => !ratingSubmitted && setHoveredRating(stars)}
+                          onMouseLeave={() => !ratingSubmitted && setHoveredRating(null)}
+                          className="p-0.5 hover:scale-110 transition-transform cursor-pointer"
+                        >
+                          <Star
+                            className={`w-5 h-5 transition-colors ${
+                              stars <= (hoveredRating || modalRating || 0)
+                                ? 'fill-amber-400 text-amber-400'
+                                : 'text-[#85827D] opacity-40'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  {ratingSubmitted && (
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50/50 border border-emerald-200/50 px-2.5 py-1 rounded-lg">
+                      Feedback saved!
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>

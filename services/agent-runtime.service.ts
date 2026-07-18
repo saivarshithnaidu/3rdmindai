@@ -284,8 +284,17 @@ export const agentRuntimeService = {
         }
       }
 
+      let learningContext = '';
+      try {
+        const { default: learningService } = await import('./learning.service');
+        learningContext = await learningService.getAgentContextWithLearnings(agentId, agent.project_id, taskDescription);
+      } catch (learningErr) {
+        console.error('Failed to inject learning context:', learningErr);
+      }
+
       const fullSystemPrompt = `[IDENTITY]
 ${systemPrompt}
+${learningContext}
 
 [YOUR MEMORY — PAST DECISIONS & OUTPUTS]
 ${memoriesStr}
@@ -334,6 +343,12 @@ ${competitorIntelStr}`;
       }
 
       let finalTask = await this.runTaskWithTools(agent, task, fullSystemPrompt, userId);
+
+      // AFTER task completes: Call learningService.recordTaskPerformance (fire-and-forget)
+      import('./learning.service').then(({ learningService }) => {
+        learningService.recordTaskPerformance(finalTask.id, agentId, agent.project_id)
+          .catch((err) => console.error('Failed to record task performance:', err));
+      });
       
       // Evaluate output with Judge Agent Layer (invisible to user, active on every task, max 3 rounds)
       try {
@@ -344,6 +359,15 @@ ${competitorIntelStr}`;
         }
       } catch (judgeErr) {
         console.error('Judge quality checking failed:', judgeErr);
+      }
+
+      // AFTER judge evaluation: Update performance log with score if available
+      if (finalTask.judge_score !== null && finalTask.judge_score !== undefined) {
+        const score = finalTask.judge_score;
+        import('./learning.service').then(({ learningService }) => {
+          learningService.updatePerformanceLogScore(finalTask.id, score)
+            .catch((err) => console.error('Failed to update performance log score:', err));
+        });
       }
       
       // Post-task processing
@@ -1056,8 +1080,17 @@ Opening angles used: Focused on scaling bottlenecks and operational workflows.`;
         }
       }
 
+      let learningContext = '';
+      try {
+        const { default: learningService } = await import('./learning.service');
+        learningContext = await learningService.getAgentContextWithLearnings(agentId, agent.project_id, taskDescription);
+      } catch (learningErr) {
+        console.error('Failed to inject learning context in executeAndSave:', learningErr);
+      }
+
       const fullSystemPrompt = `[IDENTITY]
 ${systemPrompt}
+${learningContext}
 
 [YOUR MEMORY — PAST DECISIONS & OUTPUTS]
 ${memoriesStr}
@@ -1104,6 +1137,12 @@ ${competitorIntelStr}`;
       }
 
       let finalTask = await this.runTaskWithToolsNoStreaming(agent, task, fullSystemPrompt, userId);
+
+      // AFTER task completes: Call learningService.recordTaskPerformance (fire-and-forget)
+      import('./learning.service').then(({ learningService }) => {
+        learningService.recordTaskPerformance(finalTask.id, agentId, agent.project_id)
+          .catch((err) => console.error('Failed to record task performance in executeAndSave:', err));
+      });
       
       try {
         const { default: judgeService } = await import('./judge.service');
@@ -1112,7 +1151,16 @@ ${competitorIntelStr}`;
           finalTask = await judgeService.triggerRevision(finalTask, agent, evaluation, agent.project_id, userId, false);
         }
       } catch (judgeErr) {
-        console.error('Judge quality checking failed:', judgeErr);
+        console.error('Judge quality checking failed in executeAndSave:', judgeErr);
+      }
+
+      // AFTER judge evaluation: Update performance log with score if available
+      if (finalTask.judge_score !== null && finalTask.judge_score !== undefined) {
+        const score = finalTask.judge_score;
+        import('./learning.service').then(({ learningService }) => {
+          learningService.updatePerformanceLogScore(finalTask.id, score)
+            .catch((err) => console.error('Failed to update performance log score in executeAndSave:', err));
+        });
       }
       
       const nextRunTime = new Date().toISOString();

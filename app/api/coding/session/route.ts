@@ -75,8 +75,47 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `Planning failed: ${err.message}` }, { status: 500 });
       }
 
-      // 4. Queue building task (QStash or fallback)
+      // Check complexity: if >= 4 files, spawn Code Team
+      const isComplex = plan?.files?.length >= 4;
       const appUrl = process.env.APP_URL || 'http://localhost:3000';
+
+      if (isComplex) {
+        try {
+          const { default: codeTeamService } = await import('../../../../services/code-team.service');
+          const teamConfig = await codeTeamService.assembleCodeTeam(description, projectId, session.id);
+
+          // Trigger team execution pipeline asynchronously
+          const executeUrl = `${appUrl}/api/coding/team/run`;
+
+          if (!qstashToken || qstashToken.startsWith('mock_')) {
+            console.warn('[QStash simulator] Queuing coding team run locally.');
+            setTimeout(async () => {
+              try {
+                const targetUrl = `${appUrl.startsWith('https://3rdmind.ai') ? 'http://localhost:3000' : appUrl}/api/coding/team/run`;
+                await fetch(targetUrl, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ teamId: teamConfig.teamId, projectId })
+                });
+              } catch (e) {
+                console.error('Local team run fetch failed:', e);
+              }
+            }, 100);
+          } else {
+            await qstashClient.publishJSON({
+              url: executeUrl,
+              body: { teamId: teamConfig.teamId, projectId },
+              retries: 2
+            });
+          }
+
+          return NextResponse.json({ success: true, sessionId: session.id, plan, teamAssembled: true });
+        } catch (teamErr) {
+          console.error('Failed to assemble/run code team, falling back to single agent:', teamErr);
+        }
+      }
+
+      // 4. Queue building task (QStash or fallback)
       const executeUrl = `${appUrl}/api/coding/build`;
 
       if (!qstashToken || qstashToken.startsWith('mock_')) {

@@ -18,6 +18,48 @@ interface BoardMemberCardProps {
   onSelect?: (member: EnrichedAgent) => void;
 }
 
+const renderSparkline = (scores: (number | null)[] | undefined) => {
+  if (!scores || scores.length === 0) return null;
+  const validScores = scores.filter((s): s is number => s !== null);
+  if (validScores.length < 2) return null;
+
+  const isImproving = validScores[validScores.length - 1] >= validScores[0];
+  const strokeColor = isImproving ? '#10B981' : '#F59E0B'; // green vs amber
+  
+  const width = 35;
+  const height = 12;
+  const maxVal = Math.max(...validScores, 50);
+  const minVal = 0;
+  const range = maxVal - minVal || 1;
+  
+  const points = validScores.map((val, idx) => {
+    const x = (idx / (validScores.length - 1)) * width;
+    const y = height - ((val - minVal) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="flex items-center shrink-0" title={`Recent task score trend: ${validScores.join(', ')}`}>
+      <svg width={width} height={height} className="overflow-visible">
+        <polyline
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+        <circle 
+          cx={width} 
+          cy={height - ((validScores[validScores.length - 1] - minVal) / range) * height} 
+          r="1.5" 
+          fill={strokeColor} 
+        />
+      </svg>
+    </div>
+  );
+};
+
 export default function BoardMemberCard({ member, onSelect }: BoardMemberCardProps) {
   // Map roles to friendly board titles and icons
   const roleInfo: Record<string, { title: string; desc: string; color: string; badge: string }> = {
@@ -121,6 +163,22 @@ export default function BoardMemberCard({ member, onSelect }: BoardMemberCardPro
             {member.model.split('/').pop()}
           </span>
         </div>
+
+        {/* Learning Version and Trend */}
+        {(member.strategy_version !== undefined || member.strategyVersion !== undefined) && (
+          <div className="flex items-center justify-between text-[10px] text-muted">
+            <span className="flex items-center gap-1">
+              <Sparkles className="w-3.5 h-3.5 text-[#cc785c]" />
+              <span>Learning:</span>
+            </span>
+            <div className="flex items-center gap-2">
+              {renderSparkline(member.last_5_scores || member.last5Scores)}
+              <span className="font-bold text-[#cc785c] bg-[#cc785c]/10 px-1.5 py-0.5 rounded border border-[#cc785c]/20 text-[9px] uppercase tracking-wider">
+                v{member.strategy_version || member.strategyVersion || 1}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Memory Count */}
         <div className="flex items-center justify-between text-[10px] text-muted">

@@ -445,6 +445,7 @@ ${unreadMessages}`;
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'Connection': 'keep-alive',
+        'X-Task-Id': task.id,
       },
     });
   } catch (e: any) {

@@ -214,6 +214,68 @@ export async function POST(req: NextRequest) {
         break;
       }
 
+      case 'deployment_checks': {
+        const { default: deploymentMonitorService } = await import('../../../../services/deployment-monitor.service');
+        triggeredCount = await deploymentMonitorService.checkAllMonitors();
+        break;
+      }
+
+      case 'extract_learnings': {
+        const { data: agents, error } = await supabase
+          .from('startup_agents')
+          .select('id, project_id, name')
+          .eq('is_active', true);
+        if (error) throw error;
+        if (!agents || agents.length === 0) break;
+
+        const appUrl = process.env.APP_URL || 'https://3rdmind.ai';
+
+        for (const agent of agents) {
+          if (!process.env.QSTASH_TOKEN || process.env.QSTASH_TOKEN.startsWith('mock_')) {
+            // Offline simulator fallback
+            setTimeout(async () => {
+              try {
+                const { learningService } = await import('../../../../services/learning.service');
+                const newLearnings = await learningService.extractLearnings(agent.id, agent.project_id);
+                if (newLearnings > 0) {
+                  const strategy = await learningService.updateAgentStrategy(agent.id, agent.project_id);
+                  if (strategy) {
+                    try {
+                      const { emit } = await import('../../../../lib/emit');
+                      const { StreamEventType } = await import('../../../../lib/stream-events');
+                      emit(agent.project_id, StreamEventType.AGENT_STRATEGY_UPDATED,
+                        `${agent.name} strategy updated to v${strategy.version}`,
+                        {
+                          agentId: agent.id,
+                          agentName: agent.name,
+                          detail: `${newLearnings} new patterns learned. Avg score: ${strategy.avg_score_before || 'N/A'} -> ${strategy.avg_score_after || 'N/A'}`,
+                          data: { version: strategy.version }
+                        });
+                    } catch (emitErr) {
+                      console.error('Failed to emit strategy update event:', emitErr);
+                    }
+                  }
+                }
+              } catch (e) {
+                console.error('[QStash offline simulator] Learning extraction failed:', e);
+              }
+            }, 100);
+          } else {
+            // Production QStash publish
+            await qstashClient.publishJSON({
+              url: `${appUrl}/api/learning/extract`,
+              body: {
+                agentId: agent.id,
+                projectId: agent.project_id,
+              },
+              retries: 3,
+            });
+          }
+          triggeredCount++;
+        }
+        break;
+      }
+
       default:
         return NextResponse.json({ error: `Unknown trigger type: ${trigger}` }, { status: 400 });
     }

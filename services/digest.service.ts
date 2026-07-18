@@ -115,6 +115,52 @@ export const digestService = {
     content += `- **Highest Performing Agent:** ${bestAgentName} (${bestAgentScore > -1 ? `${bestAgentScore}/50` : 'N/A'})\n`;
     content += `- **Needs Quality Refinement:** ${worstAgentName} (${worstAgentScore < 100 ? `${worstAgentScore}/50` : 'N/A'})\n\n`;
 
+    // 5b. Fetch weekly strategy improvements & learnings
+    const { data: weeklyLearnings } = await supabase
+      .from('agent_learnings')
+      .select('*')
+      .eq('project_id', projectId)
+      .gte('created_at', run.created_at);
+
+    const { data: strategyVersions } = await supabase
+      .from('agent_strategy_versions')
+      .select('*')
+      .eq('project_id', projectId)
+      .gte('created_at', run.created_at);
+
+    content += `## 🧠 Compounding Intelligence & Self-Improvements\n`;
+    if ((weeklyLearnings && weeklyLearnings.length > 0) || (strategyVersions && strategyVersions.length > 0)) {
+      if (strategyVersions && strategyVersions.length > 0) {
+        content += `### 📈 Prompt Strategy Upgrades\n`;
+        strategyVersions.forEach((v) => {
+          const agentObj = agentMap.get(v.agent_id);
+          const agentLabel = agentObj ? `${agentObj.name} (${agentObj.role.toUpperCase()})` : 'Unknown Agent';
+          content += `- **${agentLabel}** strategy updated to **v${v.version}**:\n`;
+          content += `  - *New Guidelines:* ${v.strategy_additions.slice(0, 150)}${v.strategy_additions.length > 150 ? '...' : ''}\n`;
+        });
+        content += `\n`;
+      }
+      if (weeklyLearnings && weeklyLearnings.length > 0) {
+        content += `### 💡 New Insights Extracted\n`;
+        const learningsByAgent: Record<string, string[]> = {};
+        weeklyLearnings.forEach((l) => {
+          const agentObj = agentMap.get(l.agent_id);
+          const agentLabel = agentObj ? `${agentObj.name} (${agentObj.role.toUpperCase()})` : 'Unknown Agent';
+          if (!learningsByAgent[agentLabel]) learningsByAgent[agentLabel] = [];
+          learningsByAgent[agentLabel].push(l.insight);
+        });
+        for (const [agentLabel, insights] of Object.entries(learningsByAgent)) {
+          content += `- **${agentLabel}**:\n`;
+          insights.slice(0, 3).forEach((ins) => {
+            content += `  - ${ins}\n`;
+          });
+        }
+        content += `\n`;
+      }
+    } else {
+      content += `No new prompt strategies or insights were compiled this week. (Improvements require categories with >= 3 tasks and >= 5 active learnings).\n\n`;
+    }
+
     content += `## 📅 Next Week Focus Areas\n`;
     const ceoAgent = agents?.find((a) => a.role === 'ceo');
     if (ceoAgent) {

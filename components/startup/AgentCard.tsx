@@ -47,6 +47,48 @@ function formatRelativeTime(dateStr?: string | null): string {
   return `${days}d ago`;
 }
 
+const renderSparkline = (scores: (number | null)[] | undefined) => {
+  if (!scores || scores.length === 0) return null;
+  const validScores = scores.filter((s): s is number => s !== null);
+  if (validScores.length < 2) return null;
+
+  const isImproving = validScores[validScores.length - 1] >= validScores[0];
+  const strokeColor = isImproving ? '#10B981' : '#F59E0B'; // green vs amber
+  
+  const width = 35;
+  const height = 12;
+  const maxVal = Math.max(...validScores, 50);
+  const minVal = 0;
+  const range = maxVal - minVal || 1;
+  
+  const points = validScores.map((val, idx) => {
+    const x = (idx / (validScores.length - 1)) * width;
+    const y = height - ((val - minVal) / range) * height;
+    return `${x},${y}`;
+  }).join(' ');
+
+  return (
+    <div className="flex items-center shrink-0" title={`Recent task score trend: ${validScores.join(', ')}`}>
+      <svg width={width} height={height} className="overflow-visible">
+        <polyline
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+        <circle 
+          cx={width} 
+          cy={height - ((validScores[validScores.length - 1] - minVal) / range) * height} 
+          r="1.5" 
+          fill={strokeColor} 
+        />
+      </svg>
+    </div>
+  );
+};
+
 export default function AgentCard({ agent, projectId, onGiveTask }: AgentCardProps) {
   const router = useRouter();
   const meta = roleMeta[agent.role] || {
@@ -77,14 +119,30 @@ export default function AgentCard({ agent, projectId, onGiveTask }: AgentCardPro
             </div>
             <div>
               <h3 className="text-sm font-extrabold text-[#191919]">{agent.name}</h3>
-              <p className="text-[10px] text-[#5E5B56] font-medium">{meta.title}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] text-[#5E5B56] font-medium">{meta.title}</p>
+                {renderSparkline(agent.last_5_scores || agent.last5Scores)}
+              </div>
             </div>
           </div>
 
-          {/* Model Badge */}
-          <span className="text-[9px] bg-[#F4F0EB] text-[#5E5B56] border border-[#E5E0DA] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider scale-95">
-            {modelBadge}
-          </span>
+          <div className="flex flex-col items-end gap-1.5 shrink-0">
+            {/* Model Badge */}
+            <span className="text-[9px] bg-[#F4F0EB] text-[#5E5B56] border border-[#E5E0DA] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider scale-95">
+              {modelBadge}
+            </span>
+
+            {/* Strategy Version Badge */}
+            {(agent.strategy_version !== undefined || agent.strategyVersion !== undefined) && (
+              <span 
+                title={`Strategy Version ${agent.strategy_version || agent.strategyVersion || 1} compiled from active learnings.`} 
+                className="text-[9px] bg-amber-50 text-amber-700 border border-amber-200/50 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider scale-95 flex items-center gap-0.5"
+              >
+                <Brain className="w-2.5 h-2.5 text-amber-600" />
+                v{agent.strategy_version || agent.strategyVersion || 1}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Stats Row */}
